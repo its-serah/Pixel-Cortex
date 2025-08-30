@@ -22,6 +22,7 @@ export default function AIWorkbench() {
   const [kgRes, setKgRes] = useState(null);
 
   const [chatMsg, setChatMsg] = useState('How do I fix VPN timeouts?');
+  const [engine, setEngine] = useState('deterministic'); // 'deterministic' | 'ollama'
   const [chatRes, setChatRes] = useState(null);
   const [creating, setCreating] = useState(false);
   const [createdTicket, setCreatedTicket] = useState(null);
@@ -149,7 +150,7 @@ export default function AIWorkbench() {
   const doChat = async () => {
     setChatRes(null);
     try {
-      const body = { message: chatMsg, augment: true, k: 3 };
+      const body = { message: chatMsg, augment: true, k: 3, include_explanation: true, engine };
       if (keepContext && history.length > 0) {
         body.conversation_history = history.slice(-10);
       }
@@ -252,6 +253,13 @@ export default function AIWorkbench() {
           <label className="flex items-center space-x-2 text-xs text-gray-700">
             <input type="checkbox" checked={keepContext} onChange={(e)=>setKeepContext(e.target.checked)} />
             <span>Keep context</span>
+          </label>
+          <label className="flex items-center space-x-2 text-xs text-gray-700">
+            <span>Engine</span>
+            <select className="border rounded px-2 py-1" value={engine} onChange={(e)=>setEngine(e.target.value)}>
+              <option value="deterministic">Deterministic (CPU)</option>
+              <option value="ollama">Ollama (CoT)</option>
+            </select>
           </label>
           <button onClick={doChat} className="px-4 py-2 rounded bg-primary-600 text-white">Ask</button>
           <button onClick={createTicketFromChat} disabled={!chatMsg || creating} className="px-4 py-2 rounded bg-green-600 text-white disabled:opacity-50">{creating ? 'Creating…' : 'Create Ticket'}</button>

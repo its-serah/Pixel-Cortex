@@ -22,6 +22,7 @@ class ChatRequest(BaseModel):
     k: Optional[int] = 5
     include_explanation: Optional[bool] = True
     engine: Optional[str] = "deterministic"  # "deterministic" | "ollama"
+    conversation_history: Optional[list] = None
 
 @router.post("/chat")
 async def chat(req: ChatRequest, db: Session = Depends(get_db)) -> Dict[str, Any]:
