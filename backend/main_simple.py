@@ -871,7 +871,7 @@ from pydantic import Field
 
 class ChatMessage(BaseModel):
     message: str
-    conversation_history: list = []
+    conversation_history: list = Field(default_factory=list)
     augment: bool = True
     k: int = 3
 
@@ -889,12 +889,6 @@ async def chat_with_llm(chat_data: ChatMessage, current_user: dict = Depends(get
                 "Provide numbered steps only when necessary for actions, not your internal thoughts."
             )
         }]
-        # RAG augmentation
-        if chat_data.augment:
-            top = _ragkg.search(chat_data.message, k=min(5, max(1, chat_data.k)))
-            if top:
-                ctx = "\n\n".join([f"[{i+1}] {t['content'][:600]}" for i, t in enumerate(top)])
-                messages.append({"role": "system", "content": f"Relevant policy context:\n{ctx}"})
         if chat_data.conversation_history:
             messages.extend(chat_data.conversation_history[-10:])
         messages.append({"role": "user", "content": chat_data.message})
