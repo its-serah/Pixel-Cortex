@@ -12,6 +12,11 @@ import time
 from typing import List, Dict, Any, Optional
 import re
 
+# Model selector for Ollama
+# Set OLLAMA_MODEL env var to override (e.g., qwen2.5:0.5b or llama3.2:3b)
+def get_ollama_model() -> str:
+    return os.getenv("OLLAMA_MODEL") or os.getenv("MODEL") or "llama3.2:3b"
+
 # Create simple app without complex imports
 app = FastAPI(
     title="Pixel Cortex - Local IT Support Agent",
@@ -80,7 +85,7 @@ async def test_llm():
     try:
         import ollama
         response = ollama.chat(
-            model="qwen2.5:0.5b",
+            model=get_ollama_model(),
             messages=[
                 {"role": "system", "content": "You are an IT support assistant. Be brief and helpful."},
                 {"role": "user", "content": "What is a VPN?"}
@@ -89,7 +94,7 @@ async def test_llm():
         return {
             "status": "success",
             "llm_response": response['message']['content'],
-            "model": "qwen2.5:0.5b"
+            "model": get_ollama_model()
         }
     except Exception as e:
         return {
@@ -98,9 +103,6 @@ async def test_llm():
             "message": "LLM not available"
         }
 
-class ChatMessage(BaseModel):
-    message: str
-    conversation_history: list = []
 
 # Helper to strip CoT and keep only final answer for user
 def _clean_llm_text(txt: str) -> (str, str):
@@ -130,41 +132,6 @@ def _clean_llm_text(txt: str) -> (str, str):
     # No detectable CoT markers; return as-is
     return txt.strip(), ""
 
-@app.post("/api/llm/chat_simple")
-async def chat_with_llm_simple(chat_data: ChatMessage, current_user: dict = Depends(get_current_user)):
-    """Legacy simple chat; kept for debugging. Path changed to avoid duplicate."""
-    try:
-        import ollama
-        messages = [{
-            "role": "system",
-            "content": (
-                "You are Pixel Cortex, an expert IT Support Assistant. "
-                "Do NOT include your chain-of-thought or internal reasoning in responses. "
-                "If you need to reason, do so silently and return only the final answer. "
-                "Format strictly as: 'Answer: <final answer>'. "
-                "Provide numbered steps only when necessary for actions."
-            )
-        }]
-        if chat_data.conversation_history:
-            messages.extend(chat_data.conversation_history[-10:])
-        messages.append({"role": "user", "content": chat_data.message})
-        resp = ollama.chat(model="qwen2.5:0.5b", messages=messages, options={"temperature": 0.6, "top_p": 0.9, "num_predict": 500})
-        raw = resp['message']['content']
-        final_text, cot = _clean_llm_text(raw)
-        if cot:
-            try:
-                logger.info(json.dumps({
-                    "ts": datetime.utcnow().isoformat(),
-                    "type": "llm_chat_cot",
-                    "user": current_user.get("username"),
-                    "prompt": chat_data.message,
-                    "cot": cot[:4000]
-                }))
-            except Exception:
-                pass
-        return {"status": "success", "response": final_text, "model": "qwen2.5:0.5b"}
-    except Exception as e:
-        return {"status": "error", "error": str(e), "message": "LLM chat not available"}
 
 @app.get("/api/audio/test")
 async def test_audio():
@@ -453,7 +420,7 @@ async def get_ticket(ticket_id: int, current_user: dict = Depends(get_current_us
         ticket["requester"] != current_user["username"]):
         raise HTTPException(status_code=403, detail="Access denied")
     
-return ticket
+    return ticket
 
 class TicketStatusUpdate(BaseModel):
     status: str
@@ -561,7 +528,7 @@ async def search(search_data: SearchRequest, current_user: dict = Depends(get_cu
         import ollama
         summary_prompt = f"Summarize these search results for the query '{search_data.query}': {str(results[:3])}"
         summary_response = ollama.chat(
-            model="qwen2.5:0.5b",
+            model=get_ollama_model(),
             messages=[
                 {"role": "system", "content": "You are an IT support assistant. Provide brief summaries."},
                 {"role": "user", "content": summary_prompt}
@@ -747,7 +714,7 @@ Recommended Actions: [immediate steps to take]
 """
         
         response = ollama.chat(
-            model="qwen2.5:0.5b",
+            model=get_ollama_model(),
             messages=[
                 {"role": "system", "content": "You are an expert IT support triage specialist. Analyze requests quickly and accurately."},
                 {"role": "user", "content": triage_prompt}
@@ -878,7 +845,7 @@ async def rag_search(body: RAGSearchRequest, current_user: dict = Depends(get_cu
         import ollama
         ctx = "\n---\n".join([r["content"][:400] for r in results[:3]])
         prompt = f"Question: {body.query}\nContext:\n{ctx}\n\nAnswer concisely and technically."
-        resp = ollama.chat(model="qwen2.5:0.5b", messages=[{"role":"system","content":"You are an IT support assistant."},{"role":"user","content":prompt}], options={"num_predict": 300})
+        resp = ollama.chat(model=get_ollama_model(), messages=[{"role":"system","content":"You are an IT support assistant."},{"role":"user","content":prompt}], options={"num_predict": 300})
         summary = resp['message']['content']
     except Exception:
         summary = f"Retrieved {len(results)} policy chunks for '{body.query}'."
@@ -956,7 +923,7 @@ async def chat_with_llm(chat_data: ChatMessage, current_user: dict = Depends(get
                 "No markdown, no extra prose."
             )
         })
-        resp = ollama.chat(model="qwen2.5:0.5b", messages=messages, options={"num_predict": 400, "temperature": 0.4})
+        resp = ollama.chat(model=get_ollama_model(), messages=messages, options={"num_predict": 400, "temperature": 0.4})
         raw = resp['message']['content']
 
         # Sanitize to extract JSON
@@ -1041,9 +1008,45 @@ async def chat_with_llm(chat_data: ChatMessage, current_user: dict = Depends(get
             }))
         except Exception:
             pass
-        return {"status": "success", "response": final_text_clean, "model": "qwen2.5:0.5b", "structured": {"decision": decision, "decision_reason": decision_reason, "checklist": checklist, "policy_citations": policy_citations, "notes": notes, "citations_resolved": resolved_citations}}
+        return {"status": "success", "response": final_text_clean, "model": get_ollama_model(), "structured": {"decision": decision, "decision_reason": decision_reason, "checklist": checklist, "policy_citations": policy_citations, "notes": notes, "citations_resolved": resolved_citations}}
     except Exception as e:
         return {"status": "error", "error": str(e)}
+
+# Legacy simple chat (now placed after auth to avoid import-time errors)
+@app.post("/api/llm/chat_simple")
+async def chat_with_llm_simple(chat_data: ChatMessage, current_user: dict = Depends(get_current_user)):
+    try:
+        import ollama
+        messages = [{
+            "role": "system",
+            "content": (
+                "You are Pixel Cortex, an expert IT Support Assistant. "
+                "Do NOT include your chain-of-thought or internal reasoning in responses. "
+                "If you need to reason, do so silently and return only the final answer. "
+                "Format strictly as: 'Answer: <final answer>'. "
+                "Provide numbered steps only when necessary for actions."
+            )
+        }]
+        if chat_data.conversation_history:
+            messages.extend(chat_data.conversation_history[-10:])
+        messages.append({"role": "user", "content": chat_data.message})
+        resp = ollama.chat(model=get_ollama_model(), messages=messages, options={"temperature": 0.6, "top_p": 0.9, "num_predict": 500})
+        raw = resp['message']['content']
+        final_text, cot = _clean_llm_text(raw)
+        if cot:
+            try:
+                logger.info(json.dumps({
+                    "ts": datetime.utcnow().isoformat(),
+                    "type": "llm_chat_cot",
+                    "user": current_user.get("username"),
+                    "prompt": chat_data.message,
+                    "cot": cot[:4000]
+                }))
+            except Exception:
+                pass
+        return {"status": "success", "response": final_text, "model": get_ollama_model()}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "message": "LLM chat not available"}
 
 # === ANALYTICS ===
 

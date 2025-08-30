@@ -26,6 +26,8 @@ export default function AIWorkbench() {
   const [creating, setCreating] = useState(false);
   const [createdTicket, setCreatedTicket] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [keepContext, setKeepContext] = useState(true);
+  const [history, setHistory] = useState([]); // [{role:'user'|'assistant', content:string}]
 
   const indexPolicies = async () => {
     setIndexing(true);
@@ -147,8 +149,15 @@ export default function AIWorkbench() {
   const doChat = async () => {
     setChatRes(null);
     try {
-      const res = await api.post('/api/llm/chat', { message: chatMsg, augment: true, k: 3 });
+      const body = { message: chatMsg, augment: true, k: 3 };
+      if (keepContext && history.length > 0) {
+        body.conversation_history = history.slice(-10);
+      }
+      const res = await api.post('/api/llm/chat', body);
       setChatRes(res.data);
+      if (keepContext && res.data?.response) {
+        setHistory(prev => [...prev, { role: 'user', content: chatMsg }, { role: 'assistant', content: res.data.response }]);
+      }
     } catch (e) {
       setChatRes({ error: e.response?.data?.detail || e.message });
     }
@@ -233,16 +242,33 @@ export default function AIWorkbench() {
       </div>
 
       <Section title="LLM Chat (RAG-augmented)">
-        <div className="flex space-x-2 mb-3">
+        <div className="flex items-center space-x-2 mb-3">
           <input
             className="flex-1 border rounded px-3 py-2"
             placeholder="Type a question..."
             value={chatMsg}
             onChange={(e) => setChatMsg(e.target.value)}
           />
+          <label className="flex items-center space-x-2 text-xs text-gray-700">
+            <input type="checkbox" checked={keepContext} onChange={(e)=>setKeepContext(e.target.checked)} />
+            <span>Keep context</span>
+          </label>
           <button onClick={doChat} className="px-4 py-2 rounded bg-primary-600 text-white">Ask</button>
           <button onClick={createTicketFromChat} disabled={!chatMsg || creating} className="px-4 py-2 rounded bg-green-600 text-white disabled:opacity-50">{creating ? 'Creating…' : 'Create Ticket'}</button>
         </div>
+        {keepContext && history.length > 0 && (
+          <div className="mb-4 bg-white border rounded p-3 max-h-64 overflow-auto">
+            <div className="text-sm font-semibold mb-2">Conversation</div>
+            <ul className="space-y-2">
+              {history.map((m, idx) => (
+                <li key={idx} className="text-sm">
+                  <span className={`font-medium ${m.role==='user'?'text-blue-700':'text-green-700'}`}>{m.role==='user'?'User':'Assistant'}:</span>
+                  <span className="ml-2 whitespace-pre-wrap">{m.content}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {chatRes && (
           <>
             <div className="text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded mb-4">
