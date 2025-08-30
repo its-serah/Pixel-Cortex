@@ -23,6 +23,9 @@ export default function AIWorkbench() {
 
   const [chatMsg, setChatMsg] = useState('How do I fix VPN timeouts?');
   const [chatRes, setChatRes] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [createdTicket, setCreatedTicket] = useState(null);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const indexPolicies = async () => {
     setIndexing(true);
@@ -34,6 +37,89 @@ export default function AIWorkbench() {
       setIndexRes({ error: e.response?.data?.detail || e.message });
     } finally {
       setIndexing(false);
+    }
+  };
+
+  const createTicketFromChat = async () => {
+    if (!chatMsg) return;
+    setCreating(true);
+    setCreatedTicket(null);
+    try {
+      // 1) Triage
+      const triageBody = {
+        title: chatMsg.slice(0, 120),
+        description: chatRes?.response || chatMsg,
+        user_role: 'user'
+      };
+      const triage = await api.post('/api/triage/analyze', triageBody).then(r => r.data);
+      const category = triage?.triage_result?.category || 'other';
+      const priority = triage?.triage_result?.priority || 'medium';
+
+      // 2) Build ticket description with structured decision (if any)
+      let descParts = [];
+      descParts.push(`User Issue: ${chatMsg}`);
+      if (chatRes?.structured) {
+        const s = chatRes.structured;
+        descParts.push('\nAI Decision:');
+        descParts.push(`- Outcome: ${s.decision}`);
+        if (s.decision_reason) descParts.push(`- Reason: ${s.decision_reason}`);
+        if (Array.isArray(s.checklist) && s.checklist.length > 0) {
+          descParts.push('\nChecklist:');
+          s.checklist.forEach((step, i) => descParts.push(`  ${i + 1}. ${step}`));
+        }
+        const cites = s.citations_resolved?.length ? s.citations_resolved : s.policy_citations;
+        if (Array.isArray(cites) && cites.length > 0) {
+          descParts.push('\nCitations:');
+          cites.forEach(c => descParts.push(`  ${c.reference || ''} ${c.title}`));
+        }
+        if (s.notes) {
+          descParts.push(`\nNotes: ${s.notes}`);
+        }
+      } else if (chatRes?.response) {
+        descParts.push(`\nAI Guidance:\n${chatRes.response}`);
+      }
+      const description = descParts.join('\n');
+
+      // 3) Create ticket
+      const createBody = {
+        title: chatMsg.slice(0, 120),
+        description,
+        category,
+        priority
+      };
+      const created = await api.post('/api/tickets', createBody).then(r => r.data);
+      setCreatedTicket(created.ticket);
+    } catch (e) {
+      alert(`Ticket creation failed: ${e.response?.data?.detail || e.message}`);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const updateTicketStatus = async (status) => {
+    if (!createdTicket?.id) return;
+    setUpdatingStatus(true);
+    try {
+      // build policy_refs from structured citations if available
+      let refs = [];
+      const s = chatRes?.structured;
+      if (s) {
+        const cites = s.citations_resolved?.length ? s.citations_resolved : s.policy_citations;
+        if (Array.isArray(cites)) {
+          refs = cites.map(c => c.reference).filter(Boolean);
+        }
+      }
+      const body = {
+        status,
+        resolution_code: status === 'resolved' || status === 'closed' ? 'AI-CHECKLIST-OK' : undefined,
+        policy_refs: refs
+      };
+      const updated = await api.patch(`/api/tickets/${createdTicket.id}/status`, body).then(r => r.data);
+      setCreatedTicket(updated.ticket);
+    } catch (e) {
+      alert(`Status update failed: ${e.response?.data?.detail || e.message}`);
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -155,6 +241,7 @@ export default function AIWorkbench() {
             onChange={(e) => setChatMsg(e.target.value)}
           />
           <button onClick={doChat} className="px-4 py-2 rounded bg-primary-600 text-white">Ask</button>
+          <button onClick={createTicketFromChat} disabled={!chatMsg || creating} className="px-4 py-2 rounded bg-green-600 text-white disabled:opacity-50">{creating ? 'Creating…' : 'Create Ticket'}</button>
         </div>
         {chatRes && (
           <>
@@ -218,6 +305,23 @@ export default function AIWorkbench() {
               </div>
             )}
           </>
+
+            {createdTicket && (
+              <div className="mt-4 bg-white border rounded p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold">Created Ticket</div>
+                    <div className="text-sm text-gray-700">#{createdTicket.id} — {createdTicket.title}</div>
+                    <div className="text-xs text-gray-500 mt-1 capitalize">Status: {createdTicket.status}</div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button disabled={updatingStatus || createdTicket.status === 'in_progress'} onClick={() => updateTicketStatus('in_progress')} className="px-3 py-1 text-xs rounded border bg-white hover:bg-gray-50 disabled:opacity-50">In Progress</button>
+                    <button disabled={updatingStatus || createdTicket.status === 'resolved' || createdTicket.status === 'closed'} onClick={() => updateTicketStatus('resolved')} className="px-3 py-1 text-xs rounded border bg-white hover:bg-gray-50 disabled:opacity-50">Resolve</button>
+                    <button disabled={updatingStatus || createdTicket.status === 'closed'} onClick={() => updateTicketStatus('closed')} className="px-3 py-1 text-xs rounded border bg-white hover:bg-gray-50 disabled:opacity-50">Close</button>
+                  </div>
+                </div>
+              </div>
+            )}
         )}
       </Section>
     </div>
