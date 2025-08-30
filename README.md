@@ -169,6 +169,117 @@ Demo accounts:
 - Agent: agent1 / agent123
 - User: user1 / user123
 
+### Local Run (CPU) — Step-by-step
+
+Prereqs
+- Python 3.10+ and pip
+- Node 16+ (for the frontend)
+- Optional for true LLM: Ollama installed
+
+1) Backend deps (CPU)
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.render.txt
+# Optional: download NLTK data once
+python -m nltk.downloader punkt stopwords
+```
+
+2) Seed demo users and sample tickets
+```bash
+python - << 'PY'
+import os
+os.environ["DATABASE_URL"]="sqlite:///./pixel_cortex.db"
+from app.core.database import engine
+from app.models import models
+models.Base.metadata.create_all(bind=engine)
+from app.core.seed import seed_database
+seed_database()
+print("Seed done")
+PY
+```
+Demo logins:
+- admin / admin123
+- agent1 / agent123
+- user1 / user123
+
+3) Start the backend (CPU Vosk audio enabled)
+```bash
+# Optional: choose a user-writable model path for Vosk
+export VOSK_MODEL_PATH="$HOME/models/vosk-model-small-en-us-0.15"
+uvicorn run_basic:app --host 0.0.0.0 --port 8000
+```
+Notes: first audio call auto-downloads the Vosk model to VOSK_MODEL_PATH.
+
+4) Get admin token
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123"}' \
+  | python -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+```
+
+5) Index policies and build KG‑Lite
+```bash
+curl -s -X POST http://localhost:8000/api/policies/reindex \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"policies_dir":"../policies"}'
+
+curl -s -X POST http://localhost:8000/api/kg-lite/rebuild \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+6) Test KG‑Lite endpoints (optional)
+```bash
+curl -s http://localhost:8000/api/kg-lite/stats
+curl -s 'http://localhost:8000/api/kg-lite/concepts?limit=20'
+curl -s 'http://localhost:8000/api/kg-lite/path?source=VPN&target=MFA'
+```
+
+7) Chat (deterministic KG‑RAG, CPU‑only)
+```bash
+curl -s -X POST http://localhost:8000/api/llm/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"How do I reset my password?"}'
+```
+
+8) Chat (true LLM + CoT via Ollama, optional)
+```bash
+# In another terminal:
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama pull qwen2.5:0.5b
+ollama serve
+# Optional: pick model
+export OLLAMA_MODEL=qwen2.5:0.5b
+# Then call chat with engine=ollama
+curl -s -X POST http://localhost:8000/api/llm/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"How do I reset my password?","engine":"ollama"}'
+```
+
+9) Audio test (CPU Vosk)
+```bash
+curl -s http://localhost:8000/api/audio/test
+curl -s -X POST http://localhost:8000/api/audio/transcribe \
+  -F 'file=@/absolute/path/to/file.wav'
+```
+
+10) Close a ticket (requires resolution_code)
+```bash
+curl -s -X POST http://localhost:8000/api/tickets/1/close \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"resolution_code":"IT-123"}'
+```
+
+11) Frontend (optional)
+```bash
+cd ../frontend
+npm install
+REACT_APP_API_URL=http://localhost:8000 npm start
+```
+
 ### Prerequisites
 - Docker and Docker Compose
 - Git
