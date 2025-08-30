@@ -13,9 +13,10 @@ from typing import List, Dict, Any, Optional
 import re
 
 # Model selector for Ollama
-# Set OLLAMA_MODEL env var to override (e.g., qwen2.5:0.5b or llama3.2:3b)
+# Always use the lighter model for performance on low-resource systems.
+# If you ever need to override, change this function.
 def get_ollama_model() -> str:
-    return os.getenv("OLLAMA_MODEL") or os.getenv("MODEL") or "llama3.2:3b"
+    return "qwen2.5:0.5b"
 
 # Create simple app without complex imports
 app = FastAPI(
