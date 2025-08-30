@@ -241,3 +241,25 @@ class PolicyConceptExtraction(Base):
     # Relationships
     chunk = relationship("PolicyChunk")
     concept = relationship("KnowledgeGraphConcept")
+
+class ConversationLog(Base):
+    __tablename__ = "conversation_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    
+    # Message data
+    user_message = Column(Text, nullable=False)
+    ai_response = Column(Text, nullable=False)
+    
+    # Metadata
+    response_time_ms = Column(Integer, nullable=True)
+    model_used = Column(String, nullable=True)
+    confidence_score = Column(Float, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User")

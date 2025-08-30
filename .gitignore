@@ -1,0 +1,38 @@
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Python
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Node
+frontend/node_modules/
+
+# Virtualenv
+backend/venv/
+
+# Env / secrets
+.env
+*.env
+
+# Build / dist
+build/
+dist/
+
+# App logs / data / cache
+backend/logs/
+backend/pixel_cortex.db
+/data/
+
+# Joblib / models / caches
+*.joblib
+
+# Misc
+**/.ipynb_checkpoints/
+
