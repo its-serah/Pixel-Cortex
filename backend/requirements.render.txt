@@ -26,4 +26,5 @@ PyPDF2==3.0.1
 vosk==0.3.45
 soundfile==0.12.1
 
-
+# Optional LLM client (Ollama) for CoT chat
+ollama==0.3.3

@@ -101,6 +101,30 @@ npm start
 Logs are written to backend/logs/app.jsonl (one JSON line per request).
 
 ### CPU-only Audio (Vosk) – New Default
+
+### True LLM with CoT (Ollama) – Optional
+Run a neural LLM locally with full CoT prompting and audit-safe reasoning extraction.
+
+Local setup:
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull a small model (recommended for CPU)
+ollama pull qwen2.5:0.5b
+
+# Start Ollama server (in a separate terminal)
+ollama serve
+
+# Optional: set model via env
+export OLLAMA_MODEL=qwen2.5:0.5b
+```
+
+Use the API:
+- POST /api/llm/chat with body: { "message": "...", "engine": "ollama" }
+- Returns final answer + explanation (CoT extracted and stored).
+
+Note for Render: the default Python runtime won’t run Ollama on the instance. Use the deterministic engine on Render, and use Ollama locally, or switch to the Docker runtime that starts Ollama.
 Vosk provides offline speech-to-text on CPU with a small model footprint. This replaces Whisper/Torch in the lightweight mode and keeps deploy size under 500MB.
 
 Setup locally:
@@ -202,8 +226,12 @@ make up
 - `POST /api/kg/query` – Graph traversal from concepts (body: { concepts: string[], max_hops?: number })
 
 ### LLM
-- `POST /api/llm/chat` – Chat with retrieval‑augmentation
-  - Body: { message: string, conversation_history?: Message[], augment?: boolean (default true), k?: number (default 3) }
+- `POST /api/llm/chat` – Two engines available
+  - Deterministic CPU KG‑RAG (default):
+    - Body: { message: string, augment?: boolean (default true), k?: number (default 5), include_explanation?: boolean (default true), engine?: "deterministic" }
+  - True LLM with CoT via Ollama:
+    - Body: { message: string, engine: "ollama", include_explanation?: boolean (default true) }
+    - Requires local Ollama server (`ollama serve`) and a small model (e.g., `ollama pull qwen2.5:0.5b`).
 - `GET /api/policies/documents` - List policy documents
 - `POST /api/policies/search` - Search policies using hybrid retrieval
 - `POST /api/policies/reindex` - Reindex policy documents (admin only)
