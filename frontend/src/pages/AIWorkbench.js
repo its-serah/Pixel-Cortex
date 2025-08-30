@@ -157,7 +157,67 @@ export default function AIWorkbench() {
           <button onClick={doChat} className="px-4 py-2 rounded bg-primary-600 text-white">Ask</button>
         </div>
         {chatRes && (
-          <div className="text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded">{chatRes.response || chatRes.error}</div>
+          <>
+            <div className="text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded mb-4">
+              {chatRes.response || chatRes.error}
+            </div>
+
+            {chatRes.structured && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white border rounded p-3">
+                  <div className="text-sm font-semibold mb-2">Decision</div>
+                  <div className="text-sm"><span className="font-medium">Outcome:</span> {chatRes.structured.decision || 'n/a'}</div>
+                  {chatRes.structured.decision_reason && (
+                    <div className="text-sm mt-1"><span className="font-medium">Reason:</span> {chatRes.structured.decision_reason}</div>
+                  )}
+                </div>
+
+                <div className="bg-white border rounded p-3">
+                  <div className="text-sm font-semibold mb-2">Checklist</div>
+                  {Array.isArray(chatRes.structured.checklist) && chatRes.structured.checklist.length > 0 ? (
+                    <ol className="list-decimal pl-5 text-sm space-y-1">
+                      {chatRes.structured.checklist.map((s, idx) => (
+                        <li key={idx}>{s}</li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <div className="text-sm text-gray-500">No steps provided.</div>
+                  )}
+                </div>
+
+                <div className="bg-white border rounded p-3">
+                  <div className="text-sm font-semibold mb-2">Citations</div>
+                  {Array.isArray(chatRes.structured.citations_resolved) && chatRes.structured.citations_resolved.length > 0 ? (
+                    <ul className="text-sm space-y-1">
+                      {chatRes.structured.citations_resolved.map((c, idx) => (
+                        <li key={idx}>
+                          <span className="font-mono mr-1">{c.reference}</span>
+                          {c.title}
+                          {c.chunk_id ? <span className="text-gray-500"> (chunk {c.chunk_id.slice(0,6)}…)</span> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : Array.isArray(chatRes.structured.policy_citations) && chatRes.structured.policy_citations.length > 0 ? (
+                    <ul className="text-sm space-y-1">
+                      {chatRes.structured.policy_citations.map((c, idx) => (
+                        <li key={idx}>
+                          <span className="font-mono mr-1">{c.reference}</span>
+                          {c.title}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-gray-500">No citations.</div>
+                  )}
+                </div>
+
+                <div className="bg-white border rounded p-3">
+                  <div className="text-sm font-semibold mb-2">Notes</div>
+                  <div className="text-sm whitespace-pre-wrap">{chatRes.structured.notes || '—'}</div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </Section>
     </div>
