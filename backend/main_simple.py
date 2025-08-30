@@ -13,9 +13,10 @@ from typing import List, Dict, Any, Optional
 import re
 
 # Model selector for Ollama
-# Set OLLAMA_MODEL env var to override (e.g., qwen2.5:0.5b or llama3.2:3b)
+# Always use the lighter model for performance on low-resource systems.
+# If you ever need to override, change this function.
 def get_ollama_model() -> str:
-    return os.getenv("OLLAMA_MODEL") or os.getenv("MODEL") or "llama3.2:3b"
+    return "qwen2.5:0.5b"
 
 # Create simple app without complex imports
 app = FastAPI(
@@ -221,6 +222,12 @@ DEMO_USERS = {
         "password": "user123"  # Plain text for demo
     }
 }
+# Precompute demo password hashes to align with production practices (while preserving plaintext fallback for tests)
+try:
+    for _u in DEMO_USERS.values():
+        _u['password_hash'] = get_password_hash(_u['password'])
+except Exception:
+    pass
 
 class LoginRequest(BaseModel):
     username: str
@@ -247,10 +254,17 @@ def authenticate_user(username: str, password: str):
     user = DEMO_USERS.get(username)
     if not user:
         return False
-    # For demo purposes, using plain text password comparison
-    if password != user["password"]:
-        return False
-    return user
+    # Prefer hashed verification if available
+    try:
+        ph = user.get('password_hash')
+        if ph and verify_password(password, ph):
+            return user
+    except Exception:
+        pass
+    # Fallback to plaintext comparison for demo
+    if password == user.get("password"):
+        return user
+    return False
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -718,7 +732,8 @@ Recommended Actions: [immediate steps to take]
             messages=[
                 {"role": "system", "content": "You are an expert IT support triage specialist. Analyze requests quickly and accurately."},
                 {"role": "user", "content": triage_prompt}
-            ]
+            ],
+            options={"num_predict": int(os.getenv("LLM_TRIAGE_NUM_PREDICT", "200"))}
         )
         
         analysis = response['message']['content']
@@ -845,7 +860,11 @@ async def rag_search(body: RAGSearchRequest, current_user: dict = Depends(get_cu
         import ollama
         ctx = "\n---\n".join([r["content"][:400] for r in results[:3]])
         prompt = f"Question: {body.query}\nContext:\n{ctx}\n\nAnswer concisely and technically."
-        resp = ollama.chat(model=get_ollama_model(), messages=[{"role":"system","content":"You are an IT support assistant."},{"role":"user","content":prompt}], options={"num_predict": 300})
+        resp = ollama.chat(
+            model=get_ollama_model(),
+            messages=[{"role":"system","content":"You are an IT support assistant."},{"role":"user","content":prompt}],
+            options={"num_predict": int(os.getenv("LLM_SUMMARY_NUM_PREDICT", "300"))}
+        )
         summary = resp['message']['content']
     except Exception:
         summary = f"Retrieved {len(results)} policy chunks for '{body.query}'."
@@ -918,7 +937,14 @@ async def chat_with_llm(chat_data: ChatMessage, current_user: dict = Depends(get
             )
         })
         _t0 = time.time()
-        resp = ollama.chat(model=get_ollama_model(), messages=messages, options={"num_predict": 400, "temperature": 0.4})
+        resp = ollama.chat(
+            model=get_ollama_model(),
+            messages=messages,
+            options={
+                "num_predict": int(os.getenv("LLM_NUM_PREDICT", "400")),
+                "temperature": float(os.getenv("LLM_TEMPERATURE", "0.4"))
+            }
+        )
         inference_ms = int((time.time() - _t0) * 1000)
         raw = resp['message']['content']
 
@@ -1027,7 +1053,15 @@ async def chat_with_llm_simple(chat_data: ChatMessage, current_user: dict = Depe
         if chat_data.conversation_history:
             messages.extend(chat_data.conversation_history[-10:])
         messages.append({"role": "user", "content": chat_data.message})
-        resp = ollama.chat(model=get_ollama_model(), messages=messages, options={"temperature": 0.6, "top_p": 0.9, "num_predict": 500})
+        resp = ollama.chat(
+            model=get_ollama_model(),
+            messages=messages,
+            options={
+                "temperature": float(os.getenv("LLM_TEMPERATURE", "0.6")),
+                "top_p": float(os.getenv("LLM_TOP_P", "0.9")),
+                "num_predict": int(os.getenv("LLM_SIMPLE_NUM_PREDICT", "500"))
+            }
+        )
         raw = resp['message']['content']
         final_text, cot = _clean_llm_text(raw)
         if cot:
