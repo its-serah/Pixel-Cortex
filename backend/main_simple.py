@@ -9,7 +9,8 @@ import os
 import json
 import logging
 import time
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+import re
 
 # Create simple app without complex imports
 app = FastAPI(
@@ -101,67 +102,69 @@ class ChatMessage(BaseModel):
     message: str
     conversation_history: list = []
 
-@app.post("/api/llm/chat")
-async def chat_with_llm(chat_data: ChatMessage, current_user: dict = Depends(get_current_user)):
-    """Chat with the LLM - supports full conversations"""
+# Helper to strip CoT and keep only final answer for user
+def _clean_llm_text(txt: str) -> (str, str):
+    if not txt:
+        return "", ""
+    low = txt.lower()
+    # Prefer explicit Final Answer marker
+    if "final answer:" in low:
+        idx = low.find("final answer:")
+        cot = txt[:idx].strip()
+        final = txt[idx+len("final answer:"):].strip()
+        return final, cot
+    # Generic Answer marker
+    if re.search(r"\banswer:\s*", low):
+        m = re.search(r"(?is)(.*?)\banswer:\s*(.*)$", txt)
+        if m:
+            cot = (m.group(1) or "").strip()
+            final = (m.group(2) or "").strip()
+            return final, cot
+    # Reasoning sections
+    if re.search(r"(?i)reasoning\s*:", txt):
+        # Remove reasoning block
+        final = re.sub(r"(?is)reasoning\s*:[\s\S]*", "", txt).strip()
+        cotm = re.search(r"(?is)reasoning\s*:\s*([\s\S]*)", txt)
+        cot = cotm.group(1).strip() if cotm else ""
+        return final, cot
+    # No detectable CoT markers; return as-is
+    return txt.strip(), ""
+
+@app.post("/api/llm/chat_simple")
+async def chat_with_llm_simple(chat_data: ChatMessage, current_user: dict = Depends(get_current_user)):
+    """Legacy simple chat; kept for debugging. Path changed to avoid duplicate."""
     try:
         import ollama
-        
-        # Build message history
-        messages = [
-            {
-                "role": "system", 
-                "content": """You are Pixel Cortex, an expert IT Support Assistant with advanced AI capabilities.
-
-Your role:
-- Help with computer hardware and software issues
-- Troubleshoot network connectivity problems
-- Assist with system administration tasks
-- Address cybersecurity concerns
-- Provide user access and authentication support
-- Offer technical troubleshooting guidance
-
-Always:
-- Be professional, helpful, and solution-focused
-- Provide step-by-step instructions when appropriate
-- Ask clarifying questions if needed
-- Consider security implications
-- Suggest escalation when necessary
-
-You can handle ANY IT support question - not just audio/text processing!"""
-            }
-        ]
-        
-        # Add conversation history
+        messages = [{
+            "role": "system",
+            "content": (
+                "You are Pixel Cortex, an expert IT Support Assistant. "
+                "Do NOT include your chain-of-thought or internal reasoning in responses. "
+                "If you need to reason, do so silently and return only the final answer. "
+                "Format strictly as: 'Answer: <final answer>'. "
+                "Provide numbered steps only when necessary for actions."
+            )
+        }]
         if chat_data.conversation_history:
-            messages.extend(chat_data.conversation_history[-10:])  # Keep last 10 messages for context
-        
-        # Add current message
+            messages.extend(chat_data.conversation_history[-10:])
         messages.append({"role": "user", "content": chat_data.message})
-        
-        response = ollama.chat(
-            model="qwen2.5:0.5b",
-            messages=messages,
-            options={
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "num_predict": 500  # qwen uses num_predict instead of max_tokens
-            }
-        )
-        
-        return {
-            "status": "success",
-            "response": response['message']['content'],
-            "model": "qwen2.5:0.5b",
-            "user": current_user["full_name"],
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        resp = ollama.chat(model="qwen2.5:0.5b", messages=messages, options={"temperature": 0.6, "top_p": 0.9, "num_predict": 500})
+        raw = resp['message']['content']
+        final_text, cot = _clean_llm_text(raw)
+        if cot:
+            try:
+                logger.info(json.dumps({
+                    "ts": datetime.utcnow().isoformat(),
+                    "type": "llm_chat_cot",
+                    "user": current_user.get("username"),
+                    "prompt": chat_data.message,
+                    "cot": cot[:4000]
+                }))
+            except Exception:
+                pass
+        return {"status": "success", "response": final_text, "model": "qwen2.5:0.5b"}
     except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "message": "LLM chat not available"
-        }
+        return {"status": "error", "error": str(e), "message": "LLM chat not available"}
 
 @app.get("/api/audio/test")
 async def test_audio():
@@ -450,7 +453,49 @@ async def get_ticket(ticket_id: int, current_user: dict = Depends(get_current_us
         ticket["requester"] != current_user["username"]):
         raise HTTPException(status_code=403, detail="Access denied")
     
-    return ticket
+return ticket
+
+class TicketStatusUpdate(BaseModel):
+    status: str
+    resolution_code: Optional[str] = None
+    policy_refs: Optional[List[str]] = None
+
+ALLOWED_STATUSES = ["open","in_progress","resolved","closed"]
+ALLOWED_TRANSITIONS = {
+    "open": {"in_progress","resolved","closed"},
+    "in_progress": {"resolved","closed"},
+    "resolved": {"closed"},
+    "closed": set()
+}
+
+@app.patch("/api/tickets/{ticket_id}/status")
+async def update_ticket_status(ticket_id: int, body: TicketStatusUpdate, current_user: dict = Depends(get_current_user)):
+    ticket = DEMO_TICKETS.get(ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    new_status = body.status.lower()
+    if new_status not in ALLOWED_STATUSES:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    old = ticket["status"].lower()
+    if new_status not in ALLOWED_TRANSITIONS.get(old, set()):
+        raise HTTPException(status_code=400, detail=f"Invalid transition {old} -> {new_status}")
+    ticket["status"] = new_status
+    ticket["updated_at"] = datetime.utcnow().isoformat()
+    # Log transition
+    try:
+        logger.info(json.dumps({
+            "ts": datetime.utcnow().isoformat(),
+            "type": "ticket_status_change",
+            "ticket_id": ticket_id,
+            "from": old,
+            "to": new_status,
+            "by": current_user.get("username"),
+            "resolution_code": body.resolution_code,
+            "policy_refs": body.policy_refs or []
+        }))
+    except Exception:
+        pass
+    return {"message": "status updated", "ticket": ticket}
 
 # === SEARCH SYSTEM ===
 
@@ -869,7 +914,13 @@ async def chat_with_llm(chat_data: ChatMessage, current_user: dict = Depends(get
         import ollama
         messages = [{
             "role": "system",
-            "content": """You are Pixel Cortex, an expert IT Support Assistant. Be precise, safe, and actionable."""
+            "content": (
+                "You are Pixel Cortex, an expert IT Support Assistant. "
+                "Do NOT include your chain-of-thought or internal reasoning in responses. "
+                "If you need to reason, do so silently and return only the final answer. "
+                "Format strictly as: 'Answer: <final answer>'. "
+                "Provide numbered steps only when necessary for actions, not your internal thoughts."
+            )
         }]
         # RAG augmentation
         if chat_data.augment:
@@ -880,8 +931,117 @@ async def chat_with_llm(chat_data: ChatMessage, current_user: dict = Depends(get
         if chat_data.conversation_history:
             messages.extend(chat_data.conversation_history[-10:])
         messages.append({"role": "user", "content": chat_data.message})
-        resp = ollama.chat(model="qwen2.5:0.5b", messages=messages, options={"num_predict": 500, "temperature": 0.6})
-        return {"status": "success", "response": resp['message']['content'], "model": "qwen2.5:0.5b"}
+# Build enumerated policy context to enable citations
+        citations = []
+        if chat_data.augment:
+            top = _ragkg.search(chat_data.message, k=min(5, max(1, chat_data.k)))
+            if top:
+                ctx = []
+                for i, t in enumerate(top):
+                    ref = f"[{i+1}]"
+                    citations.append({"reference": ref, "title": t["document_title"], "chunk_id": t["chunk_id"]})
+                    ctx.append(f"{ref} {t['document_title']}: {t['content'][:600]}")
+                messages.append({"role": "system", "content": "Relevant policy context:\n" + "\n\n".join(ctx)})
+        
+        # Require strict JSON output
+        messages.append({
+            "role": "system",
+            "content": (
+                "Return ONLY valid JSON with this exact schema: "
+                "{\"decision\":\"allowed|denied|requires_approval\","
+                "\"decision_reason\":\"string\","
+                "\"checklist\":[\"step 1\",\"step 2\"],"
+                "\"policy_citations\":[{\"title\":\"string\",\"reference\":\"[1]\"}],"
+                "\"notes\":\"string of missing details or caveats\"}. "
+                "No markdown, no extra prose."
+            )
+        })
+        resp = ollama.chat(model="qwen2.5:0.5b", messages=messages, options={"num_predict": 400, "temperature": 0.4})
+        raw = resp['message']['content']
+
+        # Sanitize to extract JSON
+        txt = raw.strip()
+        if not (txt.startswith("{") and txt.endswith("}")):
+            # try to slice between first { and last }
+            if "{" in txt and "}" in txt:
+                txt = txt[txt.find("{"):txt.rfind("}")+1]
+        structured = None
+        try:
+            structured = json.loads(txt)
+        except Exception:
+            structured = None
+        
+        # Normalize structured fields
+        allowed = {"allowed","denied","requires_approval"}
+        decision = None
+        decision_reason = ""
+        checklist = []
+        policy_citations = []
+        notes = ""
+        if isinstance(structured, dict):
+            decision = str(structured.get("decision","requires_approval")).lower()
+            if decision not in allowed:
+                decision = "requires_approval"
+            decision_reason = str(structured.get("decision_reason",""))
+            checklist = [str(s) for s in structured.get("checklist", []) if isinstance(s, str)]
+            pc = structured.get("policy_citations", [])
+            if isinstance(pc, list):
+                for c in pc:
+                    if isinstance(c, dict) and "title" in c and "reference" in c:
+                        policy_citations.append({"title": str(c["title"]), "reference": str(c["reference"])})
+            notes = str(structured.get("notes",""))
+        else:
+            decision = "requires_approval"
+        
+        # Resolve references to chunk ids (server-side mapping)
+        ref_map = {c["reference"]: c for c in citations}
+        resolved_citations = []
+        for c in policy_citations:
+            rc = ref_map.get(c["reference"]) or {"reference": c["reference"], "title": c["title"], "chunk_id": None}
+            resolved_citations.append(rc)
+        
+        # Build user-facing response text
+        lines = []
+        lines.append(f"Decision: {decision}" + (f" — {decision_reason}" if decision_reason else ""))
+        if checklist:
+            lines.append("Checklist:")
+            for i, step in enumerate(checklist, 1):
+                lines.append(f"  {i}. {step}")
+        if resolved_citations:
+            lines.append("Citations:")
+            for rc in resolved_citations:
+                lines.append(f"  {rc['reference']} {rc['title']}")
+        if notes:
+            lines.append(f"Notes: {notes}")
+        final_text = "\n".join(lines)
+        
+        # Log CoT if any
+        final_text_clean, cot = _clean_llm_text(final_text)
+        if cot:
+            try:
+                logger.info(json.dumps({
+                    "ts": datetime.utcnow().isoformat(),
+                    "type": "llm_chat_cot",
+                    "user": current_user.get("username"),
+                    "prompt": chat_data.message,
+                    "cot": cot[:4000]
+                }))
+            except Exception:
+                pass
+        # Log structured decision
+        try:
+            logger.info(json.dumps({
+                "ts": datetime.utcnow().isoformat(),
+                "type": "llm_chat_structured",
+                "user": current_user.get("username"),
+                "prompt": chat_data.message,
+                "decision": decision,
+                "checklist_len": len(checklist),
+                "citations": resolved_citations
+            }))
+        except Exception:
+            pass
+        return {"status": "success", "response": final_text_clean, "model": "qwen2.5:0.5b", "structured": {"decision": decision, "decision_reason": decision_reason, "checklist": checklist, "policy_citations": policy_citations, "notes": notes, "citations_resolved": resolved_citations}}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
