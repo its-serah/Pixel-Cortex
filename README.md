@@ -43,6 +43,58 @@ A local-first IT Support ticketing system with Explainable AI (XAI) that provide
 
 ## Quick Start
 
+### Lightweight RAG+KG (Local, no Docker)
+
+This mode runs the optimized backend and the React frontend with the new RAG + Knowledge Graph and AI Workbench. It uses a fast local LLM (qwen2.5:0.5b via Ollama) and TF‑IDF for retrieval.
+
+1) Install Ollama and pull the model
+
+```bash
+# Install Ollama (Linux)
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull a small, fast model
+ollama pull qwen2.5:0.5b
+```
+
+2) Start the backend (lightweight demo)
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+
+# Minimal dependencies for the demo backend
+pip install fastapi uvicorn[standard] scikit-learn networkx joblib python-jose[cryptography] passlib[bcrypt]
+
+# Optional: audio processing (for /api/audio/transcribe)
+pip install openai-whisper librosa soundfile SpeechRecognition pydub webrtcvad
+
+# Run the simplified backend with RAG+KG + AI endpoints
+uvicorn main_simple:app --host 0.0.0.0 --port 8000 --reload
+```
+
+3) Start the frontend
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+4) Use the app
+- Sign in at http://localhost:3000 (demo users below)
+- Navigate to "AI Workbench"
+  - Click "Index Policies" (indexes ./policies or POLICIES_DIR)
+  - Try RAG Search, KG Query, and LLM Chat (RAG‑augmented)
+
+Logs are written to backend/logs/app.jsonl (one JSON line per request).
+
+Demo accounts:
+- Admin: admin / admin123
+- Agent: agent1 / agent123
+- User: user1 / user123
+
 ### Prerequisites
 - Docker and Docker Compose
 - Git
@@ -92,6 +144,16 @@ make up
 - `GET /api/triage/priorities` - Get available priorities
 
 ### Policies
+
+### RAG + KG (API)
+- `POST /api/rag/index` – Index policies and build KG (body: { policies_dir?: string })
+- `POST /api/rag/search` – Retrieve top chunks + LLM summary (body: { query: string, k?: number })
+- `POST /api/kg/build` – Rebuild KG from current chunks
+- `POST /api/kg/query` – Graph traversal from concepts (body: { concepts: string[], max_hops?: number })
+
+### LLM
+- `POST /api/llm/chat` – Chat with retrieval‑augmentation
+  - Body: { message: string, conversation_history?: Message[], augment?: boolean (default true), k?: number (default 3) }
 - `GET /api/policies/documents` - List policy documents
 - `POST /api/policies/search` - Search policies using hybrid retrieval
 - `POST /api/policies/reindex` - Reindex policy documents (admin only)
@@ -190,6 +252,8 @@ make dev-frontend
 
 ## Local Development (without Docker)
 
+Note: For the fastest path, use the Lightweight RAG+KG steps above. The following section describes the original full stack setup.
+
 1. **Backend setup**:
 ```bash
 cd backend
@@ -220,9 +284,9 @@ The system supports multiple policy document formats:
 - **Text (.txt)**: Direct processing
 
 ### Adding Policies
-1. Place policy documents in the `policies/` directory
-2. Restart the backend service (auto-indexes on startup)
-3. Or manually trigger reindexing via API: `POST /api/policies/reindex`
+1. Place policy documents in the `policies/` directory (or set POLICIES_DIR in .env)
+2. In Lightweight mode, build index with: `POST /api/rag/index` (AI Workbench UI provides a button)
+3. In the original stack, you can reindex via `POST /api/policies/reindex` (if enabled)
 
 ### Sample Policies Included
 - `hardware_policy.md`: Hardware troubleshooting procedures
