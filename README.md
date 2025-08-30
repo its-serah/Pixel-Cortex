@@ -399,3 +399,7 @@ MIT License - see LICENSE file for details.
 5. Submit pull request with clear description
 
 For questions or support, please open an issue in the GitHub repository.
+
+Link to the PPT
+https://www.canva.com/design/DAGxiVLj5Is/YvxprSyYllFKoJCc2M6x2A/edit?ui=eyJBIjp7fX0
+
