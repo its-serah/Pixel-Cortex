@@ -917,7 +917,9 @@ async def chat_with_llm(chat_data: ChatMessage, current_user: dict = Depends(get
                 "No markdown, no extra prose."
             )
         })
+        _t0 = time.time()
         resp = ollama.chat(model=get_ollama_model(), messages=messages, options={"num_predict": 400, "temperature": 0.4})
+        inference_ms = int((time.time() - _t0) * 1000)
         raw = resp['message']['content']
 
         # Sanitize to extract JSON
@@ -998,11 +1000,12 @@ async def chat_with_llm(chat_data: ChatMessage, current_user: dict = Depends(get
                 "prompt": chat_data.message,
                 "decision": decision,
                 "checklist_len": len(checklist),
-                "citations": resolved_citations
+                "citations": resolved_citations,
+                "inference_ms": inference_ms
             }))
         except Exception:
             pass
-        return {"status": "success", "response": final_text_clean, "model": get_ollama_model(), "structured": {"decision": decision, "decision_reason": decision_reason, "checklist": checklist, "policy_citations": policy_citations, "notes": notes, "citations_resolved": resolved_citations}}
+        return {"status": "success", "response": final_text_clean, "model": get_ollama_model(), "structured": {"decision": decision, "decision_reason": decision_reason, "checklist": checklist, "policy_citations": policy_citations, "notes": notes, "citations_resolved": resolved_citations}, "inference_ms": inference_ms}
     except Exception as e:
         return {"status": "error", "error": str(e)}
 
