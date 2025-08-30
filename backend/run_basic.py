@@ -24,7 +24,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.database import engine
 from app.models import models
+from app.core.migrations import ensure_ticket_columns
 
+# Ensure new columns exist before running
+ensure_ticket_columns(engine)
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
 
@@ -61,6 +64,22 @@ try:
     print("Vosk CPU audio endpoints enabled")
 except Exception as e:
     print(f"Audio CPU router not available: {e}")
+
+# KG Lite endpoints (no spaCy/networkx)
+try:
+    from app.api import kg_lite
+    app.include_router(kg_lite.router, prefix="/api/kg-lite", tags=["Knowledge Graph (Lite)"])
+    print("KG Lite endpoints enabled")
+except Exception as e:
+    print(f"KG Lite router not available: {e}")
+
+# LLM Chat (Ollama) endpoints
+try:
+    from app.api import llm_chat
+    app.include_router(llm_chat.router, prefix="/api/llm", tags=["LLM Chat"])
+    print("LLM chat endpoints enabled")
+except Exception as e:
+    print(f"LLM chat router not available: {e}")
 
 @app.get("/")
 async def root():

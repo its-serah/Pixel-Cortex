@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import datetime
 from app.core.database import get_db
 from app.core.security import verify_token, require_role
-from app.models.models import Ticket, TicketEvent, User
+from app.models.models import Ticket, TicketEvent, User, TicketStatus
 from app.models.schemas import TicketCreate, TicketResponse, TicketUpdate, TicketEventResponse, TicketEventCreate
 from app.services.xai_service import XAIService
 from app.services.audit_service import AuditService
@@ -205,6 +205,54 @@ async def update_ticket(
     
     return ticket
 
+
+@router.post("/{ticket_id}/close")
+async def close_ticket(
+    ticket_id: int,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(verify_token),
+    audit_service: AuditService = Depends()
+):
+    """Close ticket with required resolution_code and log audit."""
+    code = (payload or {}).get("resolution_code", "").strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="resolution_code is required")
+
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    user = db.query(User).filter(User.username == current_user["username"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    ticket.status = TicketStatus.CLOSED
+    ticket.resolved_at = datetime.utcnow()
+    ticket.resolution_code = code
+    db.commit()
+    db.refresh(ticket)
+
+    # Ticket close event
+    event = TicketEvent(
+        ticket_id=ticket.id,
+        user_id=user.id,
+        event_type="closed",
+        new_value=f"resolution_code={code}"
+    )
+    db.add(event)
+    db.commit()
+
+    # Audit
+    await audit_service.log_event(
+        action="close_ticket",
+        resource_type="ticket",
+        resource_id=str(ticket.id),
+        user_id=current_user["username"],
+        event_data={"resolution_code": code}
+    )
+
+    return {"message": "Ticket closed", "ticket_id": ticket.id, "resolution_code": code}
 
 @router.get("/{ticket_id}/events", response_model=List[TicketEventResponse])
 async def get_ticket_events(
