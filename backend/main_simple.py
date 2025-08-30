@@ -221,6 +221,12 @@ DEMO_USERS = {
         "password": "user123"  # Plain text for demo
     }
 }
+# Precompute demo password hashes to align with production practices (while preserving plaintext fallback for tests)
+try:
+    for _u in DEMO_USERS.values():
+        _u['password_hash'] = get_password_hash(_u['password'])
+except Exception:
+    pass
 
 class LoginRequest(BaseModel):
     username: str
@@ -247,10 +253,17 @@ def authenticate_user(username: str, password: str):
     user = DEMO_USERS.get(username)
     if not user:
         return False
-    # For demo purposes, using plain text password comparison
-    if password != user["password"]:
-        return False
-    return user
+    # Prefer hashed verification if available
+    try:
+        ph = user.get('password_hash')
+        if ph and verify_password(password, ph):
+            return user
+    except Exception:
+        pass
+    # Fallback to plaintext comparison for demo
+    if password == user.get("password"):
+        return user
+    return False
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
