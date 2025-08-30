@@ -11,6 +11,7 @@ function Layout({ children }) {
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Tickets', href: '/tickets', icon: Ticket },
     { name: 'New Ticket', href: '/tickets/new', icon: Plus },
+    { name: 'AI Workbench', href: '/ai', icon: Settings },
   ];
 
   const isActive = (href) => {

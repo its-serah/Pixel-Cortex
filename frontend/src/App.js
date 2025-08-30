@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import Layout from './components/Layout';
+import AIWorkbench from './pages/AIWorkbench';
 import Login from './pages/Login';
 import TicketList from './pages/TicketList';
 import TicketDetail from './pages/TicketDetail';
@@ -64,6 +65,13 @@ function AppRoutes() {
         <ProtectedRoute>
           <Layout>
             <TicketDetail />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/ai" element={
+        <ProtectedRoute>
+          <Layout>
+            <AIWorkbench />
           </Layout>
         </ProtectedRoute>
       } />
