@@ -72,8 +72,13 @@ source venv/bin/activate
 # Minimal dependencies for the demo backend
 pip install fastapi uvicorn[standard] scikit-learn networkx joblib python-jose[cryptography] passlib[bcrypt]
 
-# Optional: audio processing (for /api/audio/transcribe)
-pip install openai-whisper librosa soundfile SpeechRecognition pydub webrtcvad
+# Optional: CPU-only audio (Vosk) for /api/audio/transcribe
+pip install vosk soundfile
+# Download a small English model (example)
+# mkdir -p models && cd models
+# wget https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip && unzip vosk-model-small-en-us-0.15.zip
+# export AUDIO_ENGINE=vosk
+# export VOSK_MODEL_PATH=$(pwd)/vosk-model-small-en-us-0.15
 
 # Run the simplified backend with RAG+KG + AI endpoints
 uvicorn main_simple:app --host 0.0.0.0 --port 8000 --reload
@@ -94,6 +99,46 @@ npm start
   - Try RAG Search, KG Query, and LLM Chat (RAG‑augmented)
 
 Logs are written to backend/logs/app.jsonl (one JSON line per request).
+
+### CPU-only Audio (Vosk) – New Default
+Vosk provides offline speech-to-text on CPU with a small model footprint. This replaces Whisper/Torch in the lightweight mode and keeps deploy size under 500MB.
+
+Setup locally:
+```bash
+pip install vosk soundfile
+# Download a small English model (~50–60MB), e.g.:
+mkdir -p models && cd models
+wget https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+unzip vosk-model-small-en-us-0.15.zip
+export AUDIO_ENGINE=vosk
+export VOSK_MODEL_PATH=$(pwd)/vosk-model-small-en-us-0.15
+```
+
+Render deployment (CPU-only):
+- The backend uses the Python runtime with minimal deps (requirements.render.txt).
+- Set environment variables in the backend service:
+  - AUDIO_ENGINE=vosk
+  - VOSK_MODEL_PATH=/opt/models/vosk-model-small-en-us-0.15
+- Optionally attach a small disk to store the Vosk model and fetch it at first boot.
+
+API compatibility:
+- In the full backend, audio endpoints remain the same (/api/audio/upload, /api/audio/transcribe).
+- The lightweight demo exposes /api/audio/test to verify the audio stack.
+
+### Render Deployment (Blueprint)
+Using render.yaml, deploy both backend and frontend directly from GitHub:
+
+1) Commit and push your changes
+```bash
+git add -A
+git commit -m "Switch to CPU Vosk audio + Render blueprint"
+git push
+```
+2) In Render dashboard: New -> Blueprint -> select this repo -> Apply
+3) After deploy:
+- Backend health: GET {backend_url}/health
+- Frontend is built and published as a static site
+- Configure env vars as needed: SECRET_KEY (auto), DATABASE_URL (auto from managed Postgres), CORS_ALLOW_ORIGINS, AUDIO_ENGINE=vosk, VOSK_MODEL_PATH
 
 Demo accounts:
 - Admin: admin / admin123

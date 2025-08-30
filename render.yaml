@@ -2,22 +2,30 @@ services:
   - type: web
     name: pixel-cortex-backend
     rootDir: backend
-    runtime: docker
+    env: python
     plan: free
+    buildCommand: >-
+      pip install --upgrade pip &&
+      pip install -r requirements.render.txt &&
+      python -m nltk.downloader punkt stopwords
+    startCommand: uvicorn run_basic:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: SECRET_KEY
         generateValue: true
       - key: CORS_ALLOW_ORIGINS
         value: https://pixel-cortex-frontend.onrender.com,http://localhost:3000
-      - key: LLM_NUM_PREDICT
-        value: "256"
-      - key: LLM_TEMPERATURE
-        value: "0.3"
-    healthCheckPath: /health
-    disk:
-      name: ollama-models
-      mountPath: /root/.ollama
-      sizeGB: 4
+      - key: DATABASE_URL
+        fromDatabase:
+          name: pixel-cortex-db
+          property: connectionString
+      - key: AUDIO_ENGINE
+        value: vosk
+      - key: VOSK_MODEL_PATH
+        value: /opt/models/vosk-model-small-en-us-0.15
+      - key: VOSK_MODEL_URL
+        value: https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+
   - type: static
     name: pixel-cortex-frontend
     rootDir: frontend
@@ -29,4 +37,10 @@ services:
           type: web
           name: pixel-cortex-backend
           property: url
+
+databases:
+  - name: pixel-cortex-db
+    databaseName: pixel_cortex
+    user: pixel_user
+    plan: free
 

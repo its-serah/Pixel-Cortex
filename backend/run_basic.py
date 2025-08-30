@@ -43,7 +43,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include basic routers (without LLM/Audio dependencies)
+# Include basic routers (without heavy LLM dependencies)
 try:
     from app.routers import auth, tickets, users, policies
     app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
@@ -53,6 +53,14 @@ try:
     print("Basic routers loaded successfully")
 except ImportError as e:
     print(f"Warning: Some routers failed to load: {e}")
+
+# CPU Audio (Vosk) endpoints
+try:
+    from app.api import audio_cpu
+    app.include_router(audio_cpu.router, prefix="/api/audio", tags=["Audio CPU"])
+    print("Vosk CPU audio endpoints enabled")
+except Exception as e:
+    print(f"Audio CPU router not available: {e}")
 
 @app.get("/")
 async def root():
