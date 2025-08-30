@@ -1,5 +1,7 @@
 # Pixel Cortex - Local IT Support Agent with XAI
 
+Sarah Rashidi & Lana Bou Farrage
+
 A local-first IT Support ticketing system with Explainable AI (XAI) that provides transparent, policy-grounded decisions for ticket triage and resolution planning.
 
 ## Features
@@ -399,3 +401,5 @@ MIT License - see LICENSE file for details.
 5. Submit pull request with clear description
 
 For questions or support, please open an issue in the GitHub repository.
+
+
