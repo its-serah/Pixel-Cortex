@@ -23,7 +23,7 @@ async def rag_index(req: IndexRequest, db: Session = Depends(get_db)) -> Dict[st
     try:
         idx = PolicyIndexer()
         # Force full reindex for determinism
-        idx.reindex_all_policies(req.policies_dir)
+        await idx.reindex_all_policies(req.policies_dir)
         # Rebuild KG-lite from fresh chunks
         kg_info = kg_lite_service.rebuild_from_policies(db)
         return {

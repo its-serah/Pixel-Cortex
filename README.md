@@ -83,6 +83,12 @@ curl -sS -X POST http://localhost:8000/api/agent/create-ticket \
 
 # Resolve (stores resolution_reasoning + resolution_policy_citations)
 curl -sS -X POST "http://localhost:8000/api/agent/resolve-ticket/<ID>?resolution_code=RESOLVED_VPN_CACHE_CLEAR"
+
+# One-shot auto-ticket (type an issue, it creates ticket + returns grounded response)
+curl -sS -X POST http://localhost:8000/api/agent/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"My VPN is not working"}'
+# Response includes ticket_created: { ticket_id, title, category, priority, status }
 ```
 
 Notes

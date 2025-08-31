@@ -17,7 +17,8 @@ import os
 from app.core.database import get_db
 from app.services.rag_reasoner import rag_reasoner
 from app.services.llm_service import LLMService
-from app.models.models import Ticket, TicketCategory, TicketPriority
+from app.models.models import Ticket, TicketCategory, TicketPriority, User
+from passlib.hash import bcrypt
 
 router = APIRouter()
 
@@ -90,8 +91,12 @@ async def ask_it_agent(request: AgentQuery, db: Session = Depends(get_db)):
 
         # Optional: create a ticket automatically when the user describes an issue
         ticket_data = None
-        if any(k in request.query.lower() for k in ["ticket", "issue", "vpn not working", "reset password", "error"]):
-            # Minimal auto-ticket creation using heuristics
+        auto_trigger_terms = [
+            "ticket", "issue", "vpn not working", "reset password", "error",
+            "can't connect", "not working", "problem", "won't start"
+        ]
+        if any(k in request.query.lower() for k in auto_trigger_terms):
+            # Minimal auto-ticket creation using heuristics and persist to DB
             from datetime import datetime as _dt
             q = request.query
             def _category(issue: str) -> str:
@@ -104,7 +109,7 @@ async def ask_it_agent(request: AgentQuery, db: Session = Depends(get_db)):
                     return "software"
                 if any(t in s for t in ["hardware", "laptop", "printer"]):
                     return "hardware"
-                return "general"
+                return "other"
             def _priority(issue: str) -> str:
                 s = issue.lower()
                 if any(t in s for t in ["urgent", "critical", "down", "not working", "blocked"]):
@@ -112,18 +117,41 @@ async def ask_it_agent(request: AgentQuery, db: Session = Depends(get_db)):
                 if any(t in s for t in ["slow", "issue", "problem", "help"]):
                     return "medium"
                 return "low"
+            title = q.split(".")[0][:50] or "IT Support Request"
+            category = _category(q)
+            priority = _priority(q)
+
+            # Ensure a requester exists (demo user fallback)
+            requester = db.query(User).first()
+            if not requester:
+                requester = User(
+                    username="demo",
+                    email="demo@example.com",
+                    hashed_password=bcrypt.hash("demo123"),
+                    full_name="Demo User"
+                )
+                db.add(requester)
+                db.commit()
+                db.refresh(requester)
+
+            db_ticket = Ticket(
+                title=title,
+                description=q,
+                category=TicketCategory[category.upper()],
+                priority=TicketPriority[priority.upper()],
+                requester_id=requester.id,
+                triage_reasoning={"reasoning_trace": steps, "response": response_text, "policy_citations": policies_cited}
+            )
+            db.add(db_ticket)
+            db.commit()
+            db.refresh(db_ticket)
+
             ticket_data = {
-                "id": __import__("hashlib").md5(f"{q}{_dt.utcnow()}".encode()).hexdigest()[:8],
-                "title": q.split(".")[0][:50] or "IT Support Request",
-                "description": q,
-                "category": _category(q),
-                "priority": _priority(q),
-                "status": "new",
-                "assigned_to": "unassigned",
-                "created_by": "demo",
-                "created_at": _dt.utcnow().isoformat(),
-                "reasoning": response_text,
-                "steps": steps
+                "ticket_id": db_ticket.id,
+                "title": db_ticket.title,
+                "category": db_ticket.category.value,
+                "priority": db_ticket.priority.value,
+                "status": db_ticket.status.value
             }
 
         return AgentResponse(

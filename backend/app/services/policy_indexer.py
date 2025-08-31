@@ -167,7 +167,7 @@ class PolicyIndexer:
         finally:
             db.close()
     
-    def reindex_all_policies(self, policies_dir: str):
+    async def reindex_all_policies(self, policies_dir: str):
         """Force reindex of all policies (delete existing first)"""
         db = SessionLocal()
         try:
@@ -181,5 +181,4 @@ class PolicyIndexer:
             db.close()
         
         # Reindex everything
-        import asyncio
-        asyncio.run(self.index_policies_directory(policies_dir))
+        await self.index_policies_directory(policies_dir)

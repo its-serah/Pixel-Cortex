@@ -99,7 +99,7 @@ async def reindex_policies(
     indexer = PolicyIndexer()
     
     try:
-        indexer.reindex_all_policies(policies_dir)
+        await indexer.reindex_all_policies(policies_dir)
         
         # Get updated counts
         total_docs = db.query(PolicyDocument).count()

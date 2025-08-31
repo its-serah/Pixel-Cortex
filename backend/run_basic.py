@@ -96,7 +96,7 @@ except Exception as e:
 # Serve the web interface if static folder exists
 static_path = Path(__file__).parent / "static"
 if static_path.exists():
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
 @app.get("/")
 async def root():
