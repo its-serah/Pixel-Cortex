@@ -178,11 +178,6 @@ Screenshots / UI
 - **XAI Service**: Assembles comprehensive explanation objects
 - **Audit Service**: Hash-chained logging for tamper detection
 
-### Frontend (React + Tailwind CSS)
-- **Ticket List View**: Overview of all tickets with filtering
-- **Ticket Detail View**: Complete ticket information and timeline
-- **XAI Explanation Panel**: Interactive exploration of AI decisions
-- **Dashboard**: Statistics and recent activity
 
 ## Quick Start
 
@@ -222,21 +217,7 @@ pip install vosk soundfile
 uvicorn main_simple:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-3) Start the frontend
-
-```bash
-cd frontend
-npm install
-npm start
-```
-
-4) Use the app
-- Sign in at http://localhost:3000 (demo users below)
-- Navigate to "AI Workbench"
-  - Click "Index Policies" (indexes ./policies or POLICIES_DIR)
-  - Try RAG Search, KG Query, and LLM Chat (RAG‑augmented)
-
-Logs are written to backend/logs/app.jsonl (one JSON line per request).
+Logs are written to backend/logs/agent_requests.jsonl (one JSON line per request).
 
 ### CPU-only Audio (Vosk) – New Default
 
@@ -350,23 +331,6 @@ uvicorn run_basic:app --host 0.0.0.0 --port 8000
 ```
 Notes: first audio call auto-downloads the Vosk model to VOSK_MODEL_PATH.
 
-4) Get admin token
-```bash
-TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"admin123"}' \
-  | python -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
-```
-
-5) Index policies and build KG‑Lite
-```bash
-curl -s -X POST http://localhost:8000/api/policies/reindex \
-  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"policies_dir":"../policies"}'
-
-curl -s -X POST http://localhost:8000/api/kg-lite/rebuild \
-  -H "Authorization: Bearer $TOKEN"
-```
 
 6) Test KG‑Lite endpoints (optional)
 ```bash
@@ -375,122 +339,13 @@ curl -s 'http://localhost:8000/api/kg-lite/concepts?limit=20'
 curl -s 'http://localhost:8000/api/kg-lite/path?source=VPN&target=MFA'
 ```
 
-7) Chat (deterministic KG‑RAG, CPU‑only)
-```bash
-curl -s -X POST http://localhost:8000/api/llm/chat \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"How do I reset my password?"}'
-```
 
-8) Chat (true LLM + CoT via Ollama, optional)
-```bash
-# In another terminal:
-curl -fsSL https://ollama.ai/install.sh | sh
-ollama pull qwen2.5:0.5b
-ollama serve
-# Optional: pick model
-export OLLAMA_MODEL=qwen2.5:0.5b
-# Then call chat with engine=ollama
-curl -s -X POST http://localhost:8000/api/llm/chat \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"How do I reset my password?","engine":"ollama"}'
-```
 
-9) Audio test (CPU Vosk)
-```bash
-curl -s http://localhost:8000/api/audio/test
-curl -s -X POST http://localhost:8000/api/audio/transcribe \
-  -F 'file=@/absolute/path/to/file.wav'
-```
-
-10) Close a ticket (requires resolution_code)
-```bash
-curl -s -X POST http://localhost:8000/api/tickets/1/close \
-  -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"resolution_code":"IT-123"}'
-```
-
-11) Frontend (optional)
-```bash
-cd ../frontend
-npm install
-REACT_APP_API_URL=http://localhost:8000 npm start
-```
-
-### Prerequisites
-- Docker and Docker Compose
-- Git
-
-### Local Development Setup
-
-1. **Clone and setup**:
-```bash
-git clone https://github.com/its-serah/Pixel-Cortex.git
-cd Pixel-Cortex
-cp .env.example .env
-```
-
-2. **Start services**:
-```bash
-make up
-```
-
-3. **Access the application**:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
-
-### Demo Accounts
-- **Admin**: admin / admin123
-- **Agent**: agent1 / agent123  
-- **User**: user1 / user123
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Get current user info
-- `POST /api/auth/verify-token` - Verify JWT token
-
-### Tickets
-- `GET /api/tickets` - List tickets (with filtering)
-- `POST /api/tickets` - Create new ticket (auto-triage if category not specified)
-- `GET /api/tickets/{id}` - Get ticket details
-- `PUT /api/tickets/{id}` - Update ticket
-- `GET /api/tickets/{id}/explanation` - Get XAI explanation for ticket processing
-
-### Triage & XAI
-- `POST /api/triage/analyze` - Analyze ticket for category/priority with explanation
-- `POST /api/triage/suggest-plan` - Generate action plan with full XAI explanation
-- `GET /api/triage/categories` - Get available categories
-- `GET /api/triage/priorities` - Get available priorities
-
-### Policies
-
-### RAG + KG (API)
-- `POST /api/rag/index` – Index policies and build KG (body: { policies_dir?: string })
-- `POST /api/rag/search` – Retrieve top chunks + LLM summary (body: { query: string, k?: number })
-- `POST /api/kg/build` – Rebuild KG from current chunks
-- `POST /api/kg/query` – Graph traversal from concepts (body: { concepts: string[], max_hops?: number })
-
-### LLM
-- `POST /api/llm/chat` – Two engines available
-  - Deterministic CPU KG‑RAG (default):
-    - Body: { message: string, augment?: boolean (default true), k?: number (default 5), include_explanation?: boolean (default true), engine?: "deterministic" }
-  - True LLM with CoT via Ollama:
-    - Body: { message: string, engine: "ollama", include_explanation?: boolean (default true) }
-    - Requires local Ollama server (`ollama serve`) and a small model (e.g., `ollama pull qwen2.5:0.5b`).
-- `GET /api/policies/documents` - List policy documents
-- `POST /api/policies/search` - Search policies using hybrid retrieval
-- `POST /api/policies/reindex` - Reindex policy documents (admin only)
-- `GET /api/policies/stats` - Get indexing statistics
-
-### Users (Admin only)
-- `GET /api/users` - List users
-- `POST /api/users` - Create user
-- `PUT /api/users/{id}` - Update user
-- `DELETE /api/users/{id}` - Delete user
+## API (minimal, used)
+- POST /api/rag/index – index policies for grounded answers (body: { policies_dir: string })
+- GET /api/agent/model-status – check which mini model is configured
+- POST /api/agent/ask – returns the grounded response and ticket_created in one call
+- POST /api/agent/resolve-ticket/{id}?resolution_code=... – optional close with citations
 
 ## XAI Explanation Object Schema
 
@@ -547,53 +402,7 @@ Every AI decision includes a comprehensive explanation:
 }
 ```
 
-## Development Commands
 
-```bash
-# Build all services
-make build
-
-# Start services
-make up
-
-# View logs
-make logs
-
-# Stop services
-make down
-
-# Run backend tests
-make test
-
-# Clean Docker resources
-make clean
-
-# Install dependencies locally
-make install-backend
-make install-frontend
-
-# Run services in development mode
-make dev-backend
-make dev-frontend
-```
-
-## Local Development (without Docker)
-
-Note: For the fastest path, use the Lightweight RAG+KG steps above. The following section describes the original full stack setup.
-
-1. **Backend setup**:
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-2. **Frontend setup**:
-```bash
-cd frontend
-npm install
-npm start
-```
 
 3. **Database setup**:
 ```bash
