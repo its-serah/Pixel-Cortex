@@ -40,4 +40,4 @@ onnxruntime==1.16.0  # Only 15MB!
 ollama==0.3.3
 
 # Option 4: TinyLlama via llama-cpp (CPU only, ~200MB)
-llama-cpp-python==0.2.20  # ENABLE THIS FOR LOCAL INFERENCE!
+# llama-cpp-python==0.2.20  # TEMPORARILY DISABLED - uncomment after fixing other issues
