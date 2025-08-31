@@ -234,9 +234,12 @@ async def resolve_ticket(
         
         # Compose resolution using KG-RAG
         det = rag_reasoner.chat(db, f"Resolve ticket: {ticket.title}. Code: {resolution_code}", augment=True, k=5, include_explanation=True)
+        ex = det.get("explanation", {})
+        citations = [c.get("chunk_id") for c in ex.get("policy_citations", [])]
         ticket.status = "closed"
         ticket.resolution_code = resolution_code
         ticket.resolution_reasoning = det.get("response", "")
+        ticket.resolution_policy_citations = citations
         db.commit()
         
         return {
@@ -244,9 +247,7 @@ async def resolve_ticket(
             "status": "closed",
             "resolution_code": resolution_code,
             "reasoning": ticket.resolution_reasoning,
-            "policies_applied": [
-                c.get("chunk_id") for c in det.get("explanation", {}).get("policy_citations", [])
-            ]
+            "policies_applied": citations
         }
         
     except Exception as e:

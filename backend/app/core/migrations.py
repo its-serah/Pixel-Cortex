@@ -44,4 +44,8 @@ def add_column_if_missing(engine: Engine, table: str, column: str, coldef_sql: s
 def ensure_ticket_columns(engine: Engine) -> None:
     # resolution_code stored as VARCHAR/TEXT
     add_column_if_missing(engine, "tickets", "resolution_code", "VARCHAR(255)")
+    # resolution_reasoning as TEXT
+    add_column_if_missing(engine, "tickets", "resolution_reasoning", "TEXT")
+    # resolution_policy_citations as JSON
+    add_column_if_missing(engine, "tickets", "resolution_policy_citations", "JSON")
 

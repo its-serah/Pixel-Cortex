@@ -69,6 +69,11 @@ class Ticket(Base):
     due_date = Column(DateTime, nullable=True)
     resolved_at = Column(DateTime, nullable=True)
     
+    # Resolution metadata
+    resolution_code = Column(String, nullable=True)
+    resolution_reasoning = Column(Text, nullable=True)
+    resolution_policy_citations = Column(JSON, nullable=True)  # list of chunk IDs
+    
     # Triage and XAI data
     triage_confidence = Column(Float, nullable=True)
     triage_reasoning = Column(JSON, nullable=True)
