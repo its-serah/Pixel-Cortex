@@ -31,6 +31,36 @@ A local-first IT Support ticketing system with Explainable AI (XAI) that provide
 
 ## Quick Start (Local mini‑LLM, no cloud)
 
+TL;DR (2 minutes)
+1) Optional (for reasoning): start Ollama and pull mini model
+```bash
+# Install Ollama (Linux)
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve &
+# In another terminal
+ollama pull phi3:mini
+export OLLAMA_MODEL=phi3:mini
+```
+2) Start the backend
+```bash
+pip install -r backend/requirements.txt
+uvicorn backend.run_basic:app --host 0.0.0.0 --port 8000 --reload
+```
+3) Index policies so answers can cite
+```bash
+curl -sS -X POST http://localhost:8000/api/rag/index \
+  -H 'Content-Type: application/json' \
+  -d '{"policies_dir":"../policies"}'
+```
+4) Use the website
+- Open http://localhost:8000
+- Click "Start IT Support" and ask: vpn not working
+- The agent replies with reasoning + citations, and auto‑creates a ticket
+
+Logs
+- Reasoning logs are appended to backend/logs/agent_requests.jsonl (one JSON line per request)
+- Each entry includes: query, response, policies_cited, compliance_status, reasoning trace, ticket_created, and model_used
+
 1) Install Ollama and pull a small model (choose one)
 - Recommended: phi3:mini (quality)
 - Ultra‑compact: tinyllama (smallest)
@@ -105,8 +135,13 @@ New in this build
 
 Screenshots / UI
 - Open http://localhost:8000 to use the lightweight chat UI
+- Click "Start IT Support" to reveal the chat
 - Try: "vpn not working" — it returns the grounded answer and creates a ticket, all in one response
 - Swagger UI: http://localhost:8000/docs (execute /api/agent/ask for a JSON response)
+
+![Home / Hero](backend/static/screenshots/cortexs1.png)
+![Chat Open](backend/static/screenshots/cortexs2.png)
+![One-shot Ticket Result](backend/static/screenshots/cortexs3.png)
 
 ## Architecture
 
