@@ -20,10 +20,11 @@ os.environ.setdefault("ALGORITHM", "HS256")
 os.environ.setdefault("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 os.environ.setdefault("POLICIES_DIR", "./policies")
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.database import engine
 from app.models import models
 from app.core.migrations import ensure_ticket_columns
@@ -105,6 +106,19 @@ async def root():
     if html_file.exists():
         return FileResponse(html_file)
     return {"message": "Pixel Cortex - IT Support Agent with Local LLM", "status": "running"}
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc: StarletteHTTPException):
+    """Serve a styled 404 page for browsers; JSON for API clients."""
+    try:
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept:
+            html_404 = static_path / "404.html"
+            if html_404.exists():
+                return FileResponse(html_404, status_code=404)
+    except Exception:
+        pass
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
 
 @app.get("/health")
 async def health_check():

@@ -5,214 +5,131 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pixel Cortex - IT Support Agent</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #f8fafc;          /* flat, calm background */
+            --card: #ffffff;        /* card surface */
+            --border: #e5e7eb;      /* subtle borders */
+            --text: #111827;        /* human-friendly text */
+            --muted: #6b7280;       /* secondary text */
+            --brand: #0ea5e9;       /* sky blue for accents */
+            --brand-dark: #0284c7;  /* hover */
+            --success-bg: #ecfdf5;  /* mint */
+            --success-border: #a7f3d0;
+            --danger-bg: #fef2f2;   /* rose */
+            --danger-border: #fecaca;
+            --warn-bg: #fffbeb;     /* amber */
+            --warn-border: #fde68a;
         }
-        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            background: var(--bg);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 24px;
+            color: var(--text);
         }
-        
         .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 800px;
+            background: var(--card);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            max-width: 920px;
             width: 100%;
-            padding: 40px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.06);
         }
-        
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 2em;
-        }
-        
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-        }
-        
-        .chat-box {
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            padding: 20px;
-            min-height: 400px;
-            max-height: 500px;
-            overflow-y: auto;
-            margin-bottom: 20px;
-            background: #f9f9f9;
-        }
-        
-        .message {
-            margin-bottom: 15px;
-            padding: 10px 15px;
-            border-radius: 10px;
-            animation: fadeIn 0.3s;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .user-message {
-            background: #667eea;
-            color: white;
-            margin-left: 20%;
-            text-align: right;
-        }
-        
-        .agent-message {
-            background: white;
-            border: 1px solid #e0e0e0;
-            margin-right: 20%;
-            white-space: pre-wrap;
-        }
-        
-        .input-group {
+        .header {
             display: flex;
-            gap: 10px;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 6px;
         }
-        
+        .logo {
+            width: 32px; height: 32px; display: inline-block;
+            background: url('./assets/pixelCortexLogo.svg') center/contain no-repeat;
+        }
+        .title { font-size: 1.4rem; font-weight: 600; }
+        .subtitle { color: var(--muted); margin-bottom: 16px; font-size: 0.95rem; }
+        .chat-box {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            min-height: 360px;
+            max-height: 520px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+            background: #f9fafb;
+        }
+        .message { margin-bottom: 10px; padding: 10px 12px; border-radius: 10px; animation: fadeIn 0.2s; line-height: 1.45; }
+        @keyframes fadeIn { from { opacity:0; transform: translateY(4px);} to {opacity:1; transform: translateY(0);} }
+        .user-message { background: var(--brand); color: white; margin-left: 25%; text-align: right; }
+        .agent-message { background: white; border: 1px solid var(--border); margin-right: 25%; white-space: pre-wrap; }
+        .input-group { display: flex; gap: 8px; }
         input {
-            flex: 1;
-            padding: 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 16px;
-            transition: border-color 0.3s;
+            flex: 1; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 16px;
+            transition: border-color 0.15s; background: white; color: var(--text);
         }
-        
-        input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-        
+        input::placeholder { color: #9ca3af; }
+        input:focus { outline: none; border-color: var(--brand); }
         button {
-            padding: 15px 30px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.3s;
+            padding: 12px 18px; background: var(--brand); color: white; border: none; border-radius: 10px;
+            font-size: 15px; cursor: pointer; transition: background 0.15s;
         }
-        
-        button:hover {
-            background: #764ba2;
-        }
-        
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        
-        .status {
-            margin-top: 10px;
-            padding: 10px;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-        
-        .status.allowed {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .status.denied {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .status.needs_approval {
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-        }
-        
-        .loading {
-            display: none;
-            text-align: center;
-            color: #666;
-            padding: 10px;
-        }
-        
-        .examples {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f0f0f0;
-            border-radius: 10px;
-        }
-        
-        .examples h3 {
-            color: #666;
-            margin-bottom: 10px;
-            font-size: 14px;
-        }
-        
-        .example-btn {
-            background: white;
-            color: #667eea;
-            border: 1px solid #667eea;
-            padding: 8px 15px;
-            margin: 5px;
-            font-size: 14px;
-            cursor: pointer;
-            border-radius: 5px;
-            transition: all 0.3s;
-        }
-        
-        .example-btn:hover {
-            background: #667eea;
-            color: white;
-        }
+        button:hover { background: var(--brand-dark); }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        .status { margin-top: 8px; padding: 8px; border-radius: 8px; font-size: 13px; border: 1px solid var(--border); }
+        .status.allowed { background: var(--success-bg); border-color: var(--success-border); }
+        .status.denied { background: var(--danger-bg); border-color: var(--danger-border); }
+        .status.needs_approval { background: var(--warn-bg); border-color: var(--warn-border); }
+        .loading { display: none; text-align: center; color: var(--muted); padding: 8px; font-size: 14px; }
+        .examples { margin-top: 16px; padding: 12px; background: #f3f4f6; border-radius: 10px; border: 1px solid var(--border); }
+        .examples h3 { color: var(--muted); margin-bottom: 8px; font-size: 13px; }
+        .example-btn { background: white; color: var(--brand); border: 1px solid var(--brand); padding: 6px 10px; margin: 4px; font-size: 13px; cursor: pointer; border-radius: 6px; transition: all 0.15s; }
+        .example-btn:hover { background: var(--brand); color: white; }
+        .ticket-badge { margin-top: 10px; background: var(--success-bg); border: 1px solid var(--success-border); padding: 10px; border-radius: 10px; font-size: 14px; }
+        .meta { color: var(--muted); font-size: 12px; margin-top: 6px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Pixel Cortex IT Support</h1>
-        <p class="subtitle">AI-Powered IT Support Agent with Knowledge Graph RAG</p>
+        <div class="header">
+            <span class="logo" aria-hidden="true"></span>
+            <div class="title">Pixel Cortex IT Support</div>
+        </div>
+        <p class="subtitle">Local-first helpdesk. Clear answers with policy citations. No fluff.</p>
         
         <div class="chat-box" id="chatBox">
             <div class="message agent-message">
-                Hello! I'm your IT Support Agent. I can help you with:
+                Hi! I can help with:
                 • Password resets
                 • VPN issues
-                • Software installation requests
+                • Software installs
                 • IT policy questions
                 
-                How can I assist you today?
+                How can I assist?
+                <div class="meta">Tip: Try "vpn not working" to create a ticket automatically.</div>
             </div>
         </div>
         
-        <div class="loading" id="loading">Processing your request...</div>
+        <div class="loading" id="loading">Thinking…</div>
         
         <div class="input-group">
             <input 
                 type="text" 
                 id="userInput" 
-                placeholder="Ask me anything about IT support..."
+                placeholder="Describe your IT issue (e.g., 'vpn not working')"
                 onkeypress="if(event.key === 'Enter') sendMessage()"
+                autocomplete="off"
             >
             <button onclick="sendMessage()" id="sendBtn">Send</button>
         </div>
         
         <div class="examples">
-            <h3>Try these examples:</h3>
+            <h3>Examples</h3>
             <button class="example-btn" onclick="setExample('How do I reset my password?')">Password Reset</button>
-            <button class="example-btn" onclick="setExample('My VPN is not working')">VPN Issues</button>
+            <button class="example-btn" onclick="setExample('My VPN is not working')">VPN Issue</button>
             <button class="example-btn" onclick="setExample('Can I install Chrome on my work laptop?')">Software Request</button>
             <button class="example-btn" onclick="setExample('Create a ticket for printer not working')">Create Ticket</button>
         </div>
@@ -220,97 +137,57 @@
     
     <script>
         const API_URL = window.location.origin;
+        function setExample(text) { const el = document.getElementById('userInput'); el.value = text; el.focus(); }
         
-        function setExample(text) {
-            document.getElementById('userInput').value = text;
-            document.getElementById('userInput').focus();
-        }
+        function safe(val, fallback='—') { return (val === undefined || val === null || val === '') ? fallback : val; }
         
         async function sendMessage() {
             const input = document.getElementById('userInput');
             const chatBox = document.getElementById('chatBox');
             const sendBtn = document.getElementById('sendBtn');
             const loading = document.getElementById('loading');
-            
             const message = input.value.trim();
             if (!message) return;
             
-            // Add user message
-            chatBox.innerHTML += `
-                <div class="message user-message">${message}</div>
-            `;
-            
-            // Clear input and disable button
+            chatBox.innerHTML += `<div class="message user-message">${message}</div>`;
             input.value = '';
             sendBtn.disabled = true;
             loading.style.display = 'block';
-            
             try {
-                // Call the API
                 const response = await fetch(`${API_URL}/api/agent/ask`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        query: message,
-                        include_search: true,
-                        include_policies: true,
-                        include_history: true
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: message, include_search: true, include_policies: true, include_history: true })
                 });
-                
                 const data = await response.json();
-                
                 if (response.ok) {
-                    // Add agent response
                     let agentMessage = `<div class="message agent-message">`;
-                    agentMessage += data.response || 'I understand your request. Let me help you with that.';
-                    
-                    // Add compliance status if available
+                    agentMessage += safe(data.response, 'I understand your request. Let me help you with that.');
                     if (data.compliance_status) {
-                        agentMessage += `
-                            <div class="status ${data.compliance_status}">
-                                Status: ${data.compliance_status.toUpperCase().replace('_', ' ')}
-                            </div>
-                        `;
+                        const status = data.compliance_status.toUpperCase().replace('_',' ');
+                        agentMessage += `<div class="status ${data.compliance_status}">Status: ${status}</div>`;
                     }
-                    
-                    // Add policies cited if available
-                    if (data.policies_cited && data.policies_cited.length > 0) {
-                        agentMessage += `
-                            <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                                Policies Referenced: ${data.policies_cited.join(', ')}
-                            </div>
-                        `;
+                    if (data.policies_cited && data.policies_cited.length) {
+                        agentMessage += `<div class="meta">Policies Referenced: ${data.policies_cited.join(', ')}</div>`;
                     }
-                    
                     agentMessage += `</div>`;
                     chatBox.innerHTML += agentMessage;
-                    
-                    // Add ticket info if created
                     if (data.ticket_created) {
+                        const t = data.ticket_created;
+                        const id = safe(t.ticket_id ?? t.id, '—');
+                        const category = safe(t.category, '—');
+                        const priority = safe(t.priority, '—');
                         chatBox.innerHTML += `
-                            <div class="message agent-message" style="background: #d4edda;">
-                                Ticket Created: #${data.ticket_created.id}
-                                Category: ${data.ticket_created.category}
-                                Priority: ${data.ticket_created.priority}
-                            </div>
-                        `;
+                            <div class="message agent-message ticket-badge">
+                                <strong>Ticket Created</strong> • #${id}
+                                <div class="meta">Category: ${category} • Priority: ${priority}</div>
+                            </div>`;
                     }
                 } else {
-                    chatBox.innerHTML += `
-                        <div class="message agent-message" style="background: #f8d7da;">
-                            Error: ${data.detail || 'Something went wrong. Please try again.'}
-                        </div>
-                    `;
+                    chatBox.innerHTML += `<div class="message agent-message" style="background: var(--danger-bg); border:1px solid var(--danger-border);">Error: ${safe(data.detail, 'Something went wrong.')}</div>`;
                 }
             } catch (error) {
-                chatBox.innerHTML += `
-                    <div class="message agent-message" style="background: #f8d7da;">
-                        Error: Could not connect to server. Please try again later.
-                    </div>
-                `;
+                chatBox.innerHTML += `<div class="message agent-message" style="background: var(--danger-bg); border:1px solid var(--danger-border);">Error: Could not connect to server.</div>`;
             } finally {
                 sendBtn.disabled = false;
                 loading.style.display = 'none';

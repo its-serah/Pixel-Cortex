@@ -96,6 +96,18 @@ Notes
 - Deployment files (Render/Docker) and audio endpoints were removed in this streamlined build.
 - If Ollama is not running, deterministic KG‑RAG answers still include citations and reasoning.
 
+New in this build
+- Clean, flat UI with a neutral background (no flashy gradients) and a header logo (pixelCortexLogo)
+- One‑shot auto‑ticket creation from /api/agent/ask with reasoning + policy citations
+- Reasoning logs are appended to backend/logs/agent_requests.jsonl (one JSON per request)
+- Styled 404 page for browser requests
+- Safer frontend ticket rendering (supports ticket_created.ticket_id and ticket_created.id)
+
+Screenshots / UI
+- Open http://localhost:8000 to use the lightweight chat UI
+- Try: "vpn not working" — it returns the grounded answer and creates a ticket, all in one response
+- Swagger UI: http://localhost:8000/docs (execute /api/agent/ask for a JSON response)
+
 ## Architecture
 
 ### Backend (FastAPI + PostgreSQL)

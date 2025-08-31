@@ -13,6 +13,9 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 import os
+import json
+from datetime import datetime
+from pathlib import Path
 
 from app.core.database import get_db
 from app.services.rag_reasoner import rag_reasoner
@@ -153,6 +156,27 @@ async def ask_it_agent(request: AgentQuery, db: Session = Depends(get_db)):
                 "priority": db_ticket.priority.value,
                 "status": db_ticket.status.value
             }
+
+        # Append reasoning log (JSONL)
+        try:
+            logs_dir = Path("backend/logs")
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            log_path = logs_dir / "agent_requests.jsonl"
+            log_entry = {
+                "ts": datetime.utcnow().isoformat() + "Z",
+                "query": request.query,
+                "response": response_text,
+                "policies_cited": policies_cited,
+                "compliance_status": compliance_status,
+                "reasoning": steps,
+                "ticket_created": ticket_data,
+                "model_used": os.getenv("OLLAMA_MODEL", "phi3:mini")
+            }
+            with log_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+        except Exception:
+            # Do not fail the request due to logging issues
+            pass
 
         return AgentResponse(
             response=response_text,
