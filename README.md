@@ -43,7 +43,7 @@ A local-first IT Support ticketing system with Explainable AI (XAI) that provide
 ## Quick Start (Local mini‑LLM, no cloud)
 
 TL;DR (2 minutes)
-1) Optional (for reasoning): start Ollama and pull mini model
+1) Start Ollama and pull the mini model (phi3:mini)
 ```bash
 # Install Ollama (Linux)
 curl -fsSL https://ollama.com/install.sh | sh
@@ -135,7 +135,7 @@ curl -sS -X POST http://localhost:8000/api/agent/ask \
 Notes
 - No OpenAI. Everything runs locally.
 - Deployment files (Render/Docker) and audio endpoints were removed in this streamlined build.
-- If Ollama is not running, deterministic KG‑RAG answers still include citations and reasoning.
+- This build uses the phi3:mini model via Ollama. Deterministic KG‑RAG is also available as a backup for retrieval and citations.
 
 New in this build
 - Clean, flat UI with a neutral background (no flashy gradients) and a header logo (pixelCortexLogo)
@@ -170,7 +170,7 @@ Screenshots / UI
 
 - Backend: FastAPI
 - Storage: SQLite (file: backend/pixel_cortex.db)
-- Reasoning: Optional local mini LLM via Ollama (phi3:mini), with deterministic KG‑RAG fallback
+- Reasoning: Local mini LLM via Ollama (phi3:mini), with deterministic KG‑RAG for retrieval and citations
 - Retrieval: Policy RAG (BM25/TF‑IDF) with citations
 - Logging: JSONL at backend/logs/agent_requests.jsonl (one JSON per request)
 - Behavior: One‑shot auto‑ticket creation on every /api/agent/ask
