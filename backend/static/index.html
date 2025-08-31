@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pixel Cortex - IT Support Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 :root {
@@ -30,7 +33,7 @@
             --warn-border: #fde68a;
         }
         body {
-            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            font-family: 'Poppins', Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji", "Segoe UI Emoji";
             background: var(--bg);
             min-height: 100vh;
             display: flex;
@@ -57,7 +60,8 @@
 .logo-img { width: 40px; height: 40px; display:inline-block; object-fit: contain; }
         .title { font-size: 1.4rem; font-weight: 600; }
         .subtitle { color: var(--muted); margin-bottom: 16px; font-size: 0.95rem; }
-        .chat-box {
+.chat-box {
+            animation: slideUp 320ms ease-out;
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 16px;
@@ -69,6 +73,8 @@
         }
         .message { margin-bottom: 10px; padding: 10px 12px; border-radius: 10px; animation: fadeIn 0.2s; line-height: 1.45; }
         @keyframes fadeIn { from { opacity:0; transform: translateY(4px);} to {opacity:1; transform: translateY(0);} }
+        @keyframes slideUp { from { opacity:0; transform: translateY(8px);} to {opacity:1; transform: translateY(0);} }
+        @keyframes pulse { 0%,100% { transform: scale(1);} 50% { transform: scale(1.03);} }
         .user-message { background: var(--brand); color: white; margin-left: 25%; text-align: right; }
         .agent-message { background: white; border: 1px solid var(--border); margin-right: 25%; white-space: pre-wrap; }
         .input-group { display: flex; gap: 8px; }
@@ -141,7 +147,16 @@
             </div>
         </div>
         
-        <div class="loading" id="loading">Thinking…</div>
+        <div class="loading" id="loading">
+            <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:8px;">
+                <div style="width:10px;height:10px;border-radius:50%;background:var(--brand);animation:pulse 1s infinite;"></div>
+                <div style="color:#e5e7eb;">Working securely…</div>
+            </div>
+            <div id="memeBox" style="display:none;text-align:center;">
+                <div id="memeText" class="meme-text" style="display:inline-block; text-align:left; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#fff; color:#111827; font-family: 'Poppins', system-ui, sans-serif; white-space:pre-line; max-width:320px;"></div>
+                <div class="meta">Security tip: Don’t reuse passwords. Ever.</div>
+            </div>
+        </div>
         
         <div class="input-group hidden" id="inputWrap">
             <input 
@@ -194,6 +209,33 @@
             } catch (_) {}
         }
         
+        // Meme rotation while loading
+        const MEME_TEXTS = [
+            "me: did you patch?\nserver: define 'patch'",
+            "Firewall: \"No.\"\nUser: \"I'll try again with caps lock.\"",
+            "Strong password check:\n• Length: okay\n• Symbols: eh\n• Entropy: lol no",
+            "Phishing test email: \"free pizza\"\nOffice: \"say less\"",
+            "IT: \"Have you tried turning it off and on?\"\nMe: \"Now it's haunted.\""
+        ];
+        let memeTimer = null;
+        function startMemes() {
+            const box = document.getElementById('memeBox');
+            const text = document.getElementById('memeText');
+            if (!box || !text) return;
+            box.style.display = 'block';
+            let i = 0;
+            text.textContent = MEME_TEXTS[i % MEME_TEXTS.length];
+            memeTimer = setInterval(() => {
+                i = (i + 1) % MEME_TEXTS.length;
+                text.textContent = MEME_TEXTS[i];
+            }, 1200);
+        }
+        function stopMemes() {
+            const box = document.getElementById('memeBox');
+            if (box) box.style.display = 'none';
+            if (memeTimer) { clearInterval(memeTimer); memeTimer = null; }
+        }
+
         function startChat() {
             // Reveal chat UI on the same page
             const toShow = ['chatBox','inputWrap','examplesWrap','infoCards'];
@@ -252,6 +294,7 @@
             } catch (error) {
                 chatBox.innerHTML += `<div class="message agent-message" style="background: var(--danger-bg); border:1px solid var(--danger-border);">Error: Could not connect to server.</div>`;
             } finally {
+                stopMemes();
                 sendBtn.disabled = false;
                 loading.style.display = 'none';
                 chatBox.scrollTop = chatBox.scrollHeight;
