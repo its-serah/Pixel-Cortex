@@ -22,6 +22,8 @@ os.environ.setdefault("POLICIES_DIR", "./policies")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.core.database import engine
 from app.models import models
 from app.core.migrations import ensure_ticket_columns
@@ -123,8 +125,17 @@ try:
 except Exception as e:
     print(f"IT Agent not available: {e}")
 
+# Serve the web interface if static folder exists
+static_path = Path(__file__).parent / "static"
+if static_path.exists():
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
 @app.get("/")
 async def root():
+    # Serve the HTML interface if it exists
+    html_file = static_path / "index.html"
+    if html_file.exists():
+        return FileResponse(html_file)
     return {"message": "Pixel Cortex - IT Support Agent with Local LLM", "status": "running"}
 
 @app.get("/health")
