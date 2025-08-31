@@ -150,7 +150,7 @@
         <div class="loading" id="loading">
             <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:8px;">
                 <div style="width:10px;height:10px;border-radius:50%;background:var(--brand);animation:pulse 1s infinite;"></div>
-                <div style="color:#e5e7eb;">Working securely…</div>
+                <div style="color:#e5e7eb;">Working securely… got your request. Meanwhile, here’s a meme:</div>
             </div>
             <div id="memeBox" style="display:none;text-align:center;">
                 <div id="memeText" class="meme-text" style="display:inline-block; text-align:left; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#fff; color:#111827; font-family: 'Poppins', system-ui, sans-serif; white-space:pre-line; max-width:320px;"></div>
@@ -211,11 +211,18 @@
         
         // Meme rotation while loading
         const MEME_TEXTS = [
-            "me: did you patch?\nserver: define 'patch'",
-            "Firewall: \"No.\"\nUser: \"I'll try again with caps lock.\"",
-            "Strong password check:\n• Length: okay\n• Symbols: eh\n• Entropy: lol no",
-            "Phishing test email: \"free pizza\"\nOffice: \"say less\"",
-            "IT: \"Have you tried turning it off and on?\"\nMe: \"Now it's haunted.\""
+            "I’m not antisocial, I’m just in stealth mode.",
+            "My password is the last 8 digits of Pi.",
+            "Trust me, I’m behind a firewall… and a coffee.",
+            "Ctrl + Alt + Del is my meditation pose.",
+            "Phishing: because asking nicely for your password is easier.",
+            "In cybersecurity, paranoia is just common sense.",
+            "Hackers don’t take holidays — they just work from the beach.",
+            "Update your software, or I’ll do it for you. – Every Hacker Ever",
+            "I clicked ‘Remind Me Later’… in 2016.",
+            "VPN on, pants off — work from home mode activated.",
+            "Your Wi-Fi password is now ‘guest1234’? Bold move.",
+            "404: Social life not found — patching security flaws instead."
         ];
         let memeTimer = null;
         function startMemes() {
@@ -259,6 +266,7 @@
             sendBtn.disabled = true;
             loading.style.display = 'block';
             try {
+                startMemes();
                 const response = await fetch(`${API_URL}/api/agent/ask`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

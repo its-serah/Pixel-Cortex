@@ -92,70 +92,63 @@ async def ask_it_agent(request: AgentQuery, db: Session = Depends(get_db)):
         else:
             compliance_status = "allowed"
 
-        # Optional: create a ticket automatically when the user describes an issue
+        # Auto-create a ticket for every request (fast lane)
         ticket_data = None
-        auto_trigger_terms = [
-            "ticket", "issue", "vpn not working", "reset password", "error",
-            "can't connect", "not working", "problem", "won't start"
-        ]
-        if any(k in request.query.lower() for k in auto_trigger_terms):
-            # Minimal auto-ticket creation using heuristics and persist to DB
-            from datetime import datetime as _dt
-            q = request.query
-            def _category(issue: str) -> str:
-                s = issue.lower()
-                if any(t in s for t in ["vpn", "network", "wifi", "internet"]):
-                    return "network"
-                if any(t in s for t in ["password", "login", "access", "permission"]):
-                    return "access"
-                if any(t in s for t in ["software", "install", "update"]):
-                    return "software"
-                if any(t in s for t in ["hardware", "laptop", "printer"]):
-                    return "hardware"
-                return "other"
-            def _priority(issue: str) -> str:
-                s = issue.lower()
-                if any(t in s for t in ["urgent", "critical", "down", "not working", "blocked"]):
-                    return "high"
-                if any(t in s for t in ["slow", "issue", "problem", "help"]):
-                    return "medium"
-                return "low"
-            title = q.split(".")[0][:50] or "IT Support Request"
-            category = _category(q)
-            priority = _priority(q)
+        q = request.query
+        def _category(issue: str) -> str:
+            s = issue.lower()
+            if any(t in s for t in ["vpn", "network", "wifi", "internet"]):
+                return "network"
+            if any(t in s for t in ["password", "login", "access", "permission"]):
+                return "access"
+            if any(t in s for t in ["software", "install", "update"]):
+                return "software"
+            if any(t in s for t in ["hardware", "laptop", "printer"]):
+                return "hardware"
+            return "other"
+        def _priority(issue: str) -> str:
+            s = issue.lower()
+            if any(t in s for t in ["urgent", "critical", "down", "not working", "blocked"]):
+                return "high"
+            if any(t in s for t in ["slow", "issue", "problem", "help"]):
+                return "medium"
+            return "low"
+        title = q.split(".")[0][:50] or "IT Support Request"
+        category = _category(q)
+        priority = _priority(q)
 
-            # Ensure a requester exists (demo user fallback)
-            requester = db.query(User).first()
-            if not requester:
-                requester = User(
-                    username="demo",
-                    email="demo@example.com",
-                    hashed_password=bcrypt.hash("demo123"),
-                    full_name="Demo User"
-                )
-                db.add(requester)
-                db.commit()
-                db.refresh(requester)
-
-            db_ticket = Ticket(
-                title=title,
-                description=q,
-                category=TicketCategory[category.upper()],
-                priority=TicketPriority[priority.upper()],
-                requester_id=requester.id,
-                triage_reasoning={"reasoning_trace": steps, "response": response_text, "policy_citations": policies_cited}
+        # Ensure a requester exists (demo user fallback)
+        requester = db.query(User).first()
+        if not requester:
+            requester = User(
+                username="demo",
+                email="demo@example.com",
+                hashed_password=bcrypt.hash("demo123"),
+                full_name="Demo User"
             )
-            db.add(db_ticket)
+            db.add(requester)
             db.commit()
-            db.refresh(db_ticket)
+            db.refresh(requester)
 
-            ticket_data = {
-                "ticket_id": db_ticket.id,
-                "title": db_ticket.title,
-                "category": db_ticket.category.value,
-                "priority": db_ticket.priority.value,
-                "status": db_ticket.status.value
-            }
+        db_ticket = Ticket(
+            title=title,
+            description=q,
+            category=TicketCategory[category.upper()],
+            priority=TicketPriority[priority.upper()],
+            requester_id=requester.id,
+            triage_reasoning={"reasoning_trace": steps, "response": response_text, "policy_citations": policies_cited}
+        )
+        db.add(db_ticket)
+        db.commit()
+        db.refresh(db_ticket)
+
+        ticket_data = {
+            "ticket_id": db_ticket.id,
+            "title": db_ticket.title,
+            "category": db_ticket.category.value,
+            "priority": db_ticket.priority.value,
+            "status": db_ticket.status.value
+        }
 
         # Append reasoning log (JSONL)
         try:
