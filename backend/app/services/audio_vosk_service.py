@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Dict, Any, Tuple
 
 import numpy as np
-import soundfile as sf
+# Defer soundfile import to runtime to avoid hard dependency during deployment
 
 try:
     from vosk import Model, KaldiRecognizer
@@ -86,6 +86,10 @@ class VoskAudioService:
 
     def _read_audio(self, audio_bytes: bytes) -> Tuple[np.ndarray, int]:
         # Try soundfile to read a variety of formats (wav, flac, ogg)
+        try:
+            import soundfile as sf  # local import to keep optional
+        except Exception as e:
+            raise RuntimeError("soundfile is not installed; audio decoding is unavailable on this deployment")
         with io.BytesIO(audio_bytes) as bio:
             data, sr = sf.read(bio, dtype='float32', always_2d=False)
         if data.ndim == 2:

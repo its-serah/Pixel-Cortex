@@ -25,12 +25,8 @@ services:
         value: true # Set to false for production
       - key: POLICIES_DIR
         value: ./policies
-      - key: USE_VOSK
-        value: true
-      - key: VOSK_MODEL_URL
-        value: https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
-      - key: VOSK_MODEL_PATH
-        value: /tmp/vosk-model
+      - key: PIP_ONLY_BINARY
+        value: ":all:"
       
       # LLM Configuration (choose one):
       

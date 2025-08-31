@@ -4,10 +4,18 @@ import json
 from typing import List, Dict, Tuple, Set, Optional, Any
 from datetime import datetime
 from rank_bm25 import BM25Okapi
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import nltk
+
+# Make scikit-learn optional for Render/minimal deployments
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    SKLEARN_AVAILABLE = True
+except Exception:
+    TfidfVectorizer = None  # type: ignore
+    cosine_similarity = None  # type: ignore
+    SKLEARN_AVAILABLE = False
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from sqlalchemy.orm import Session
@@ -77,16 +85,21 @@ class PolicyRetriever:
         # Initialize BM25
         if corpus:
             self.bm25 = BM25Okapi(corpus)
-            
-            # Initialize TF-IDF
+
+            # Initialize TF-IDF (if scikit-learn available)
             text_corpus = [chunk['content'] for chunk in self.chunks_data]
-            self.tfidf_vectorizer = TfidfVectorizer(
-                stop_words='english',
-                max_features=1000,
-                ngram_range=(1, 2)
-            )
-            self.tfidf_matrix = self.tfidf_vectorizer.fit_transform(text_corpus)
-            
+            if SKLEARN_AVAILABLE:
+                self.tfidf_vectorizer = TfidfVectorizer(
+                    stop_words='english',
+                    max_features=1000,
+                    ngram_range=(1, 2)
+                )
+                self.tfidf_matrix = self.tfidf_vectorizer.fit_transform(text_corpus)
+            else:
+                self.tfidf_vectorizer = None
+                self.tfidf_matrix = None
+                print("scikit-learn not available; using BM25-only retrieval")
+
             self.is_initialized = True
             print(f"Initialized retrievers with {len(chunks)} policy chunks")
     
@@ -124,15 +137,18 @@ class PolicyRetriever:
         query_tokens = self.preprocess_text(query)
         bm25_scores = self.bm25.get_scores(query_tokens)
         
-        # TF-IDF scoring
-        query_vector = self.tfidf_vectorizer.transform([query])
-        tfidf_scores = cosine_similarity(query_vector, self.tfidf_matrix).flatten()
-        
-        # Hybrid scoring (normalize and combine)
-        bm25_normalized = bm25_scores / (np.max(bm25_scores) + 1e-6)
-        tfidf_normalized = tfidf_scores / (np.max(tfidf_scores) + 1e-6)
-        
-        hybrid_scores = alpha * bm25_normalized + (1 - alpha) * tfidf_normalized
+        # TF-IDF scoring (optional)
+        if SKLEARN_AVAILABLE and self.tfidf_vectorizer is not None and self.tfidf_matrix is not None:
+            query_vector = self.tfidf_vectorizer.transform([query])
+            tfidf_scores = cosine_similarity(query_vector, self.tfidf_matrix).flatten()
+            tfidf_normalized = tfidf_scores / (np.max(tfidf_scores) + 1e-6)
+            # Hybrid scoring (normalize and combine)
+            bm25_normalized = bm25_scores / (np.max(bm25_scores) + 1e-6)
+            hybrid_scores = alpha * bm25_normalized + (1 - alpha) * tfidf_normalized
+        else:
+            # BM25-only fallback
+            bm25_normalized = bm25_scores / (np.max(bm25_scores) + 1e-6)
+            hybrid_scores = bm25_normalized
         
         # Get top k results with deterministic ordering (sort by score desc, then by chunk id)
         scored_chunks = list(zip(hybrid_scores, range(len(self.chunks_data))))

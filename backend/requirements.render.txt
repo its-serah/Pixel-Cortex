@@ -18,15 +18,13 @@ alembic==1.12.1
 
 # Retrieval (BM25 + TF‑IDF) used by policy retriever / triage planner
 rank-bm25==0.2.2
-scikit-learn==1.3.2
 nltk==3.8.1
 numpy==1.25.2
-scipy==1.11.4  # Add scipy as explicit dependency
 PyPDF2==3.0.1
 
-# CPU-only Speech-to-Text
-vosk==0.3.45
-soundfile==0.12.1
+# CPU-only Speech-to-Text (optional; disabled in minimal Render build)
+# vosk==0.3.45
+# soundfile==0.12.1
 
 # Lightweight LLM Options (choose ONE):
 
