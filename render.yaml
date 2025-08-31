@@ -6,7 +6,7 @@ services:
     runtime: python
     region: oregon # optional
     plan: free
-    buildCommand: "pip install -r requirements.render.txt"
+    buildCommand: "pip install --upgrade pip setuptools wheel && pip install cython numpy==1.25.2 && CMAKE_ARGS='-DLLAMA_BLAS=OFF -DLLAMA_CUDA=OFF -DLLAMA_METAL=OFF' pip install llama-cpp-python==0.2.20 --no-cache-dir && pip install -r requirements.render.txt --no-cache-dir"
     startCommand: "uvicorn run_basic:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: DATABASE_URL
