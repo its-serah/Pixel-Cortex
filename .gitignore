@@ -36,3 +36,12 @@ backend/pixel_cortex.db
 # Misc
 **/.ipynb_checkpoints/
 
+# Local virtualenv, logs, and caches
+.venv/
+.uvicorn.log
+*.log
+.coverage
+coverage.xml
+.mypy_cache/
+.ruff_cache/
+*.sqlite3
