@@ -6,19 +6,27 @@
     <title>Pixel Cortex - IT Support Agent</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --bg: #f8fafc;          /* flat, calm background */
-            --card: #ffffff;        /* card surface */
-            --border: #e5e7eb;      /* subtle borders */
-            --text: #111827;        /* human-friendly text */
-            --muted: #6b7280;       /* secondary text */
-            --brand: #0ea5e9;       /* sky blue for accents */
-            --brand-dark: #0284c7;  /* hover */
-            --success-bg: #ecfdf5;  /* mint */
+:root {
+            /* Palette (exact shades) */
+            --desire: #EA404D;                 /* Desire */
+            --dark-purple: #311131;            /* Dark Purple */
+            --dark-cerulean: #12447E;          /* Dark Cerulean */
+            --medium-persian-blue: #0663AA;    /* Medium Persian Blue */
+            --rich-electric-blue: #0E92D2;     /* Rich Electric Blue */
+
+            /* Theme usage */
+            --bg: var(--dark-purple);          /* solid background color */
+            --card: #ffffff;                   /* card surface */
+            --border: #e5e7eb;                 /* subtle borders */
+            --text: #111827;                   /* human-friendly text */
+            --muted: #6b7280;                  /* secondary text */
+            --brand: var(--desire);            /* primary accent */
+            --brand-dark: var(--medium-persian-blue); /* hover accent from palette */
+            --success-bg: #ecfdf5;             /* mint */
             --success-border: #a7f3d0;
-            --danger-bg: #fef2f2;   /* rose */
+            --danger-bg: #fef2f2;              /* rose */
             --danger-border: #fecaca;
-            --warn-bg: #fffbeb;     /* amber */
+            --warn-bg: #fffbeb;                /* amber */
             --warn-border: #fde68a;
         }
         body {
@@ -46,10 +54,7 @@
             gap: 12px;
             margin-bottom: 6px;
         }
-        .logo {
-            width: 32px; height: 32px; display: inline-block;
-            background: url('/static/assets/pixelCortexLogo.png') center/contain no-repeat;
-        }
+.logo-img { width: 40px; height: 40px; display:inline-block; object-fit: contain; }
         .title { font-size: 1.4rem; font-weight: 600; }
         .subtitle { color: var(--muted); margin-bottom: 16px; font-size: 0.95rem; }
         .chat-box {
@@ -98,22 +103,32 @@
         .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px; }
         .card h4 { margin-bottom: 6px; font-size: 0.95rem; }
         .card p { color: var(--muted); font-size: 0.9rem; }
+        .hero { display:flex; align-items:center; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+        .hero-row { display:flex; align-items:center; gap:12px; }
+        .cta-btn { padding: 10px 16px; background: var(--brand); color:#fff; border:none; border-radius:10px; cursor:pointer; font-weight:600; }
+        .cta-btn:hover { background: var(--brand-dark); }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <span class="logo" aria-hidden="true"></span>
-            <div class="title">Pixel Cortex IT Support</div>
+        <div class="hero">
+            <div class="hero-row">
+                <img class="logo-img" src="/static/assets/pixelCortexLogo.png" alt="Pixel Cortex logo"/>
+                <div>
+                    <div class="title">Pixel Cortex IT Support Agent</div>
+                    <p class="subtitle">On-device IT assistant. Deterministic KG‑RAG + mini LLM. Policy‑cited answers. Auto‑ticketing.</p>
+                </div>
+            </div>
+            <button id="startBtn" class="cta-btn">Start IT Support</button>
         </div>
-        <p class="subtitle">Local-first helpdesk. Clear, friendly answers grounded in your IT policies. Your data stays on this machine.</p>
         <div class="statusbar">
             <span class="chip"><span class="dot"></span><span id="modelChip">Model: loading…</span></span>
             <span class="chip">Logs: enabled</span>
             <span class="chip">Auto-ticket: on</span>
         </div>
         
-        <div class="chat-box" id="chatBox">
+        <div class="chat-box hidden" id="chatBox">
             <div class="message agent-message">
                 Hi! I can help with:
                 • Password resets
@@ -128,7 +143,7 @@
         
         <div class="loading" id="loading">Thinking…</div>
         
-        <div class="input-group">
+        <div class="input-group hidden" id="inputWrap">
             <input 
                 type="text" 
                 id="userInput" 
@@ -139,7 +154,7 @@
             <button onclick="sendMessage()" id="sendBtn">Send</button>
         </div>
         
-        <div class="examples">
+        <div class="examples hidden" id="examplesWrap">
             <h3>Examples</h3>
             <button class="example-btn" onclick="setExample('How do I reset my password?')">Password Reset</button>
             <button class="example-btn" onclick="setExample('My VPN is not working')">VPN Issue</button>
@@ -147,7 +162,7 @@
             <button class="example-btn" onclick="setExample('Create a ticket for printer not working')">Create Ticket</button>
         </div>
 
-        <div class="info-cards">
+        <div class="info-cards hidden" id="infoCards">
             <div class="card">
                 <h4>What I can help with</h4>
                 <p>• Passwords and access • VPN and connectivity • Software install requests • Policy questions</p>
@@ -179,6 +194,16 @@
             } catch (_) {}
         }
         
+        function startChat() {
+            // Reveal chat UI on the same page
+            const toShow = ['chatBox','inputWrap','examplesWrap','infoCards'];
+            toShow.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('hidden'); });
+            const input = document.getElementById('userInput');
+            if (input) { input.focus(); }
+            // Scroll to chat
+            document.getElementById('chatBox')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
         async function sendMessage() {
             const input = document.getElementById('userInput');
             const chatBox = document.getElementById('chatBox');
@@ -232,7 +257,11 @@
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
         }
-        document.addEventListener('DOMContentLoaded', fetchModelStatus);
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchModelStatus();
+            const startBtn = document.getElementById('startBtn');
+            if (startBtn) startBtn.addEventListener('click', startChat);
+        });
     </script>
 </body>
 </html>
