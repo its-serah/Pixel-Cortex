@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.auth import get_current_user
+from app.core.security import get_current_user
 from app.models.models import User
 from app.services.audio_processing_service import audio_service
 from app.services.local_llm_service import local_llm_service

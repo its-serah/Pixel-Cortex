@@ -14,8 +14,12 @@ from sqlalchemy.orm import Session
 from app.models.models import PolicyDocument, PolicyChunk, KnowledgeGraphConcept
 from app.models.schemas import PolicyCitation, KGEnhancedPolicyCitation, GraphHop
 from app.core.database import get_db
-from app.services.knowledge_graph_builder import PolicyKnowledgeGraphBuilder
-from app.services.knowledge_graph_query import KnowledgeGraphQueryService
+try:
+    from app.services.knowledge_graph_builder import PolicyKnowledgeGraphBuilder
+    from app.services.knowledge_graph_query import KnowledgeGraphQueryService
+except Exception:
+    PolicyKnowledgeGraphBuilder = None
+    KnowledgeGraphQueryService = None
 
 # Ensure NLTK data is available
 try:
@@ -33,9 +37,9 @@ class PolicyRetriever:
         self.bm25 = None
         self.chunks_data = []
         self.is_initialized = False
-        # Initialize KG services
-        self.kg_builder = PolicyKnowledgeGraphBuilder()
-        self.kg_query = KnowledgeGraphQueryService()
+        # Initialize KG services if available
+        self.kg_builder = PolicyKnowledgeGraphBuilder() if PolicyKnowledgeGraphBuilder else None
+        self.kg_query = KnowledgeGraphQueryService() if KnowledgeGraphQueryService else None
     
     def preprocess_text(self, text: str) -> List[str]:
         """Preprocess text for BM25 and TF-IDF"""
@@ -369,3 +373,6 @@ class PolicyRetriever:
         Get IT concepts mentioned in a query along with confidence scores
         """
         return self.kg_builder.find_concepts_in_text(query)
+
+# Singleton instance
+policy_retriever = PolicyRetriever()

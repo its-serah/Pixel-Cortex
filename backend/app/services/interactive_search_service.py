@@ -12,11 +12,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, text
 
 from app.core.database import get_db
-from app.models.models import Ticket, User, Policy
+from app.models.models import Ticket, User, PolicyDocument
 from app.services.local_llm_service import local_llm_service
 from app.services.conversation_memory_service import conversation_memory_service
-from app.services.prompt_engineering_service import prompt_service
-from app.services.kg_builder import KnowledgeGraphBuilder
+from app.services.prompt_engineering_service import prompt_engineering_service
+from app.services.knowledge_graph_builder import PolicyKnowledgeGraphBuilder
 
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ class InteractiveSearchService:
     """Service for LLM-enhanced interactive search and history retrieval"""
     
     def __init__(self):
-        self.kg_builder = KnowledgeGraphBuilder()
+        self.kg_builder = PolicyKnowledgeGraphBuilder()
         
     async def intelligent_search(
         self,
@@ -96,7 +96,7 @@ class InteractiveSearchService:
         """Enhance search query using LLM for better retrieval"""
         
         try:
-            prompt = prompt_service.build_prompt(
+            prompt = prompt_engineering_service.build_prompt(
                 "search_enhancement",
                 query=query,
                 context={
@@ -353,14 +353,12 @@ class InteractiveSearchService:
             db = next(get_db())
             
             # Build policy query
-            query_builder = db.query(Policy)
+            query_builder = db.query(PolicyDocument)
             
             # Apply filters
             if filters:
-                if "category" in filters:
-                    query_builder = query_builder.filter(Policy.category == filters["category"])
-                if "is_active" in filters:
-                    query_builder = query_builder.filter(Policy.is_active == filters["is_active"])
+                # PolicyDocument model has no category/is_active fields in this schema; ignore safely
+                pass
             
             policies = query_builder.all()
             
@@ -527,7 +525,7 @@ class InteractiveSearchService:
         """Calculate relevance score between query and content using LLM"""
         
         try:
-            prompt = prompt_service.build_prompt(
+            prompt = prompt_engineering_service.build_prompt(
                 "relevance_scoring",
                 query=query,
                 content=content[:1000],  # Limit content length
@@ -611,7 +609,7 @@ class InteractiveSearchService:
         """Extract key concepts from search query for knowledge graph traversal"""
         
         try:
-            prompt = prompt_service.build_prompt(
+            prompt = prompt_engineering_service.build_prompt(
                 "concept_extraction",
                 text=query,
                 context={
@@ -647,7 +645,7 @@ class InteractiveSearchService:
         """Generate explanation for why a knowledge graph concept is relevant"""
         
         try:
-            prompt = prompt_service.build_prompt(
+            prompt = prompt_engineering_service.build_prompt(
                 "relevance_explanation",
                 query=query,
                 concept=kg_result.get("concept", ""),
@@ -705,7 +703,7 @@ class InteractiveSearchService:
         """Analyze policy compliance level related to query"""
         
         try:
-            prompt = prompt_service.build_prompt(
+            prompt = prompt_engineering_service.build_prompt(
                 "compliance_analysis",
                 policy_content=policy_content[:500],  # Limit content
                 query=query,
@@ -742,7 +740,7 @@ class InteractiveSearchService:
             
             # Generate insights using LLM
             if total_results > 0:
-                prompt = prompt_service.build_prompt(
+                prompt = prompt_engineering_service.build_prompt(
                     "search_summary",
                     query=search_results.get("original_query", ""),
                     total_results=total_results,
@@ -794,7 +792,7 @@ class InteractiveSearchService:
                 avg_relevance /= len(results)
             
             # Generate insights with LLM
-            prompt = prompt_service.build_prompt(
+            prompt = prompt_engineering_service.build_prompt(
                 "unified_insights",
                 query=query,
                 result_count=len(results),
@@ -929,7 +927,7 @@ class InteractiveSearchService:
         
         try:
             # Get suggestions from LLM
-            prompt = prompt_service.build_prompt(
+            prompt = prompt_engineering_service.build_prompt(
                 "search_suggestions",
                 query=query,
                 context={

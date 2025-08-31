@@ -1,29 +1,25 @@
 """
-Configuration settings for the application
+Configuration settings for the application (no external settings deps)
 """
 import os
-from pydantic_settings import BaseSettings
 
 
-class Settings(BaseSettings):
+class Settings:
     # Database
-    DATABASE_URL: str = "sqlite:///./pixel_cortex.db"
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./pixel_cortex.db")
     
     # Redis
-    REDIS_HOST: str = "localhost"
-    REDIS_PORT: int = 6379
+    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
+    REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
     
     # Security
-    SECRET_KEY: str = "your-secret-key-here"
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
     
     # API
-    API_V1_STR: str = "/api/v1"
+    API_V1_STR: str = os.getenv("API_V1_STR", "/api/v1")
     
     # LLM
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
-    
-    class Config:
-        env_file = ".env"
+    OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
 
 # Create settings instance

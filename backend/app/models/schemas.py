@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from app.models.models import UserRole, TicketStatus, TicketPriority, TicketCategory
@@ -87,7 +87,7 @@ class ReasoningStep(BaseModel):
     action: str
     rationale: str
     confidence: float
-    policy_refs: List[int] = []  # Referenced chunk IDs
+    policy_refs: List[int] = Field(default_factory=list)  # Referenced chunk IDs
 
 class AlternativeOption(BaseModel):
     option: str
@@ -108,6 +108,9 @@ class TelemetryData(BaseModel):
     total_chunks_considered: int
     
 class ExplanationObject(BaseModel):
+    # Allow field name model_version without warnings
+    model_config = ConfigDict(protected_namespaces=())
+
     # Core decision
     answer: str
     decision: str
@@ -120,9 +123,9 @@ class ExplanationObject(BaseModel):
     policy_citations: List[PolicyCitation]
     
     # Uncertainty and alternatives
-    missing_info: List[str] = []
-    alternatives_considered: List[AlternativeOption] = []
-    counterfactuals: List[Counterfactual] = []
+    missing_info: List[str] = Field(default_factory=list)
+    alternatives_considered: List[AlternativeOption] = Field(default_factory=list)
+    counterfactuals: List[Counterfactual] = Field(default_factory=list)
     
     # Performance metrics
     telemetry: TelemetryData
@@ -199,7 +202,7 @@ class GraphHop(BaseModel):
 
 class KGEnhancedPolicyCitation(PolicyCitation):
     """Extended policy citation that includes graph reasoning"""
-    graph_path: List[GraphHop] = []  # How we reached this policy through the graph
+    graph_path: List[GraphHop] = Field(default_factory=list)  # How we reached this policy through the graph
     semantic_score: float  # Original semantic search score
     graph_boost_score: float  # Additional relevance from graph connections
     combined_score: float  # Final relevance score
@@ -215,9 +218,9 @@ class KnowledgeGraphQuery(BaseModel):
 
 class KGEnhancedExplanationObject(ExplanationObject):
     """Enhanced explanation object that includes knowledge graph reasoning"""
-    kg_policy_citations: List[KGEnhancedPolicyCitation] = []  # Graph-enhanced citations
-    graph_reasoning: List[GraphHop] = []  # Graph traversal path
-    concepts_discovered: List[str] = []  # New concepts found via graph
+    kg_policy_citations: List[KGEnhancedPolicyCitation] = Field(default_factory=list)  # Graph-enhanced citations
+    graph_reasoning: List[GraphHop] = Field(default_factory=list)  # Graph traversal path
+    concepts_discovered: List[str] = Field(default_factory=list)  # New concepts found via graph
     graph_coverage_score: float = 0.0  # How well the graph covered the query
 
 class GraphVisualization(BaseModel):
@@ -225,7 +228,7 @@ class GraphVisualization(BaseModel):
     nodes: List[Dict[str, Any]]  # Graph nodes with properties
     edges: List[Dict[str, Any]]  # Graph edges with properties
     highlighted_path: Optional[List[int]] = None  # Highlighted reasoning path
-    query_concepts: List[int] = []  # Concepts that matched the original query
+    query_concepts: List[int] = Field(default_factory=list)  # Concepts that matched the original query
 
 class PolicyConceptExtractionResponse(BaseModel):
     chunk_id: int

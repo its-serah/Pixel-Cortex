@@ -7,7 +7,7 @@ from app.core.security import verify_token, require_role
 from app.models.models import Ticket, TicketEvent, User, TicketStatus
 from app.models.schemas import TicketCreate, TicketResponse, TicketUpdate, TicketEventResponse, TicketEventCreate
 from app.services.xai_service import XAIService
-from app.services.audit_service import AuditService
+from app.services.audit_runtime import AuditService
 from app.services.decision_service import DecisionService, DecisionType
 
 router = APIRouter()

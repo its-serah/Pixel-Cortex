@@ -7,7 +7,7 @@ import ollama
 from app.models.models import TicketCategory, TicketPriority
 from app.models.schemas import ExplanationObject, ReasoningStep, PolicyCitation, TelemetryData
 from app.services.policy_retriever import PolicyRetriever
-from app.services.audit_service import AuditService
+# from app.services.audit_service import AuditService  # not required at runtime
 
 class LLMService:
     """

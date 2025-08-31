@@ -48,14 +48,24 @@ app.add_middleware(
 
 # Include basic routers (without heavy LLM dependencies)
 try:
-    from app.routers import auth, tickets, users, policies
+    from app.routers import auth, tickets, users, policies, triage, performance
     app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
     app.include_router(users.router, prefix="/api/users", tags=["Users"])
     app.include_router(tickets.router, prefix="/api/tickets", tags=["Tickets"])
     app.include_router(policies.router, prefix="/api/policies", tags=["Policies"])
-    print("Basic routers loaded successfully")
+    app.include_router(triage.router, prefix="/api/triage", tags=["Triage"])
+    app.include_router(performance.router, prefix="/api/performance", tags=["Performance"])
+    print("Core routers loaded successfully")
 except ImportError as e:
     print(f"Warning: Some routers failed to load: {e}")
+
+# Try to load search router separately 
+try:
+    from app.api import search
+    app.include_router(search.router, prefix="/api/search", tags=["Search"])
+    print("Search router loaded successfully")
+except ImportError as e:
+    print(f"Search router not available: {e}")
 
 # CPU Audio (Vosk) endpoints
 try:
@@ -73,6 +83,14 @@ try:
 except Exception as e:
     print(f"KG Lite router not available: {e}")
 
+# Tiny LLM endpoints (Works on free tier!)
+try:
+    from app.api import tiny_llm
+    app.include_router(tiny_llm.router, prefix="/api/tiny-llm", tags=["Tiny LLM"])
+    print("Tiny LLM endpoints enabled (ONNX/API/Rules)")
+except Exception as e:
+    print(f"Tiny LLM router not available: {e}")
+
 # LLM Chat (Ollama) endpoints
 try:
     from app.api import llm_chat
@@ -81,9 +99,33 @@ try:
 except Exception as e:
     print(f"LLM chat router not available: {e}")
 
+# RAG API (index + search) for AI Workbench compatibility
+try:
+    from app.api import rag_api
+    app.include_router(rag_api.router, prefix="/api/rag", tags=["RAG"])
+    print("RAG API endpoints enabled")
+except Exception as e:
+    print(f"RAG API router not available: {e}")
+
+# KG Query compat for AI Workbench
+try:
+    from app.api import kg_query
+    app.include_router(kg_query.router, prefix="/api/kg", tags=["Knowledge Graph"])
+    print("KG Query endpoints enabled")
+except Exception as e:
+    print(f"KG Query router not available: {e}")
+
+# IT Support Agent (ML Challenge implementation)
+try:
+    from app.api import it_agent
+    app.include_router(it_agent.router, prefix="/api/agent", tags=["IT Agent"])
+    print("IT Support Agent enabled (TinyLlama/Rules)")
+except Exception as e:
+    print(f"IT Agent not available: {e}")
+
 @app.get("/")
 async def root():
-    return {"message": "Pixel Cortex - Basic Mode (No LLM/Audio)", "status": "running"}
+    return {"message": "Pixel Cortex - IT Support Agent with Local LLM", "status": "running"}
 
 @app.get("/health")
 async def health_check():

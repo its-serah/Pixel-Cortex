@@ -10,8 +10,17 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev_secret_key_change_in_production")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
+# Demo mode / auth bypass flags
+_DEF_TRUE = {"1", "true", "yes", "y", "on"}
+AUTH_DISABLED = os.getenv("AUTH_DISABLED", "false").strip().lower() in _DEF_TRUE or \
+                os.getenv("DEMO_MODE", "false").strip().lower() in _DEF_TRUE
+DEMO_USERNAME = os.getenv("DEMO_USERNAME", "demo")
+# Provide broad roles in demo to avoid permission blockers during a demo
+DEMO_ROLES = [r.strip() for r in os.getenv("DEMO_ROLES", "ADMIN,USER,AGENT").split(",") if r.strip()]
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-security = HTTPBearer()
+# auto_error=False allows requests without Authorization header; we handle fallback below
+security = HTTPBearer(auto_error=False)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -30,6 +39,18 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    # Demo/auth-disabled short-circuit: bypass JWT and return a default user
+    if AUTH_DISABLED:
+        return {"username": DEMO_USERNAME, "roles": DEMO_ROLES}
+
+    # If auth is required but no credentials provided, return 401
+    if credentials is None or not getattr(credentials, "credentials", None):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     try:
         token = credentials.credentials
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -57,3 +78,7 @@ def require_role(required_role: str):
             )
         return current_user
     return role_checker
+
+# Backwards-compatible alias expected by some routers/tests
+# Returns the decoded current user dict from the Authorization header
+get_current_user = verify_token

@@ -12,8 +12,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, or_
 
-from app.models.models import ConversationLog, User, SupportTicket
-from app.models.schemas import ConversationLogCreate
+from app.models.models import ConversationLog, User, Ticket
 from app.services.local_llm_service import local_llm_service
 
 
@@ -217,11 +216,11 @@ class ConversationMemoryService:
         """
         
         # Get recent tickets
-        query = db.query(SupportTicket)
+        query = db.query(Ticket)
         if user_id:
-            query = query.filter(SupportTicket.requester_id == user_id)
+            query = query.filter(Ticket.requester_id == user_id)
         
-        recent_tickets = query.order_by(desc(SupportTicket.created_at)).limit(100).all()
+        recent_tickets = query.order_by(desc(Ticket.created_at)).limit(100).all()
         
         if not recent_tickets:
             return []

@@ -7,8 +7,15 @@ and builds a knowledge graph showing relationships between these concepts.
 
 import re
 import json
-import spacy
-import networkx as nx
+# Optional heavy deps
+try:
+    import spacy  # type: ignore
+except Exception:
+    spacy = None  # Fallback without spaCy
+try:
+    import networkx as nx  # type: ignore
+except Exception:
+    nx = None
 from typing import List, Dict, Set, Tuple, Optional, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -28,9 +35,12 @@ class PolicyKnowledgeGraphBuilder:
         """Initialize the Knowledge Graph Builder with NLP models and IT concept patterns"""
         # Load spaCy model for NER and dependency parsing
         try:
-            self.nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            print("Warning: spaCy English model not found. Install with: python -m spacy download en_core_web_sm")
+            if spacy is not None:
+                self.nlp = spacy.load("en_core_web_sm")
+            else:
+                raise ImportError("spaCy not installed")
+        except Exception:
+            print("Warning: spaCy not available. Install spaCy and the en_core_web_sm model for enhanced NLP.")
             self.nlp = None
         
         # Core IT concepts and their aliases

@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.core.security import get_password_hash, require_role
 from app.models.models import User
 from app.models.schemas import UserCreate, UserResponse, UserUpdate
-from app.services.audit_service import AuditService
+from app.services.audit_runtime import AuditService
 
 router = APIRouter()
 

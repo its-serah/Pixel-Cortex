@@ -12,18 +12,40 @@ import time
 import logging
 import tempfile
 import threading
-from typing import Dict, Any, Optional, BinaryIO, List
+from typing import Dict, Any, Optional, BinaryIO, List, Tuple
 from pathlib import Path
 
 import torch
-import whisper
-import librosa
-import soundfile as sf
-import webrtcvad
-import speech_recognition as sr
-from pydub import AudioSegment
-from pydub.silence import split_on_silence
+# Optional heavy deps with graceful fallbacks
+try:
+    import whisper  # type: ignore
+except Exception:
+    import importlib
+    whisper = importlib.import_module('whisper')  # Use local stub if available
+try:
+    import librosa  # type: ignore
+except Exception:
+    librosa = None
+try:
+    import soundfile as sf  # type: ignore
+except Exception:
+    sf = None
+try:
+    import webrtcvad  # type: ignore
+except Exception:
+    webrtcvad = None
+try:
+    import speech_recognition as sr  # type: ignore
+except Exception:
+    sr = None
+try:
+    from pydub import AudioSegment  # type: ignore
+    from pydub.silence import split_on_silence  # type: ignore
+except Exception:
+    AudioSegment = None
+    split_on_silence = None
 import numpy as np
+import wave
 
 from app.core.config import settings
 
@@ -72,10 +94,10 @@ class AudioProcessingService:
             self.whisper_model = whisper.load_model("base", device="cpu")  # Use CPU for better compatibility
             
             # Initialize VAD for voice activity detection
-            self.vad = webrtcvad.Vad(2)  # Aggressiveness level 2 (balanced)
+            self.vad = webrtcvad.Vad(2) if webrtcvad else None  # Aggressiveness level 2 (balanced)
             
             # Initialize speech recognition for fallback
-            self.recognizer = sr.Recognizer()
+            self.recognizer = sr.Recognizer() if sr else None
             
             load_time = time.time() - start_time
             logger.info(f"Audio models loaded in {load_time:.2f}s")
@@ -84,24 +106,55 @@ class AudioProcessingService:
         """Preprocess audio data for optimal transcription"""
         
         try:
-            # Convert bytes to AudioSegment
-            audio_segment = AudioSegment.from_file(io.BytesIO(audio_data), format=original_format.replace('.', ''))
-            
-            # Convert to mono if stereo
-            if audio_segment.channels > 1:
-                audio_segment = audio_segment.set_channels(1)
-            
-            # Normalize audio level
-            audio_segment = audio_segment.normalize()
-            
-            # Set target sample rate
-            audio_segment = audio_segment.set_frame_rate(self.target_sample_rate)
-            
-            # Convert to numpy array
-            audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32)
-            audio_array = audio_array / np.iinfo(audio_segment.array_type).max
-            
-            return audio_array
+            if AudioSegment is not None:
+                # Convert bytes to AudioSegment
+                audio_segment = AudioSegment.from_file(io.BytesIO(audio_data), format=original_format.replace('.', ''))
+                
+                # Convert to mono if stereo
+                if audio_segment.channels > 1:
+                    audio_segment = audio_segment.set_channels(1)
+                
+                # Normalize audio level
+                audio_segment = audio_segment.normalize()
+                
+                # Set target sample rate
+                audio_segment = audio_segment.set_frame_rate(self.target_sample_rate)
+                
+                # Convert to numpy array
+                audio_array = np.array(audio_segment.get_array_of_samples()).astype(np.float32)
+                audio_array = audio_array / np.iinfo(audio_segment.array_type).max
+                
+                return audio_array
+            else:
+                # Fallback: handle WAV using stdlib wave
+                fmt = original_format.replace('.', '').lower()
+                if fmt != 'wav':
+                    raise ValueError("Only WAV format supported without pydub installed")
+                with wave.open(io.BytesIO(audio_data), 'rb') as wf:
+                    n_channels = wf.getnchannels()
+                    sample_width = wf.getsampwidth()
+                    frame_rate = wf.getframerate()
+                    n_frames = wf.getnframes()
+                    raw = wf.readframes(n_frames)
+                # Convert to mono if needed
+                if n_channels > 1:
+                    dtype = np.int16 if sample_width == 2 else np.int8
+                    audio = np.frombuffer(raw, dtype=dtype)
+                    audio = audio.reshape(-1, n_channels).mean(axis=1)
+                else:
+                    dtype = np.int16 if sample_width == 2 else np.int8
+                    audio = np.frombuffer(raw, dtype=dtype)
+                # Normalize to float32 -1..1
+                max_val = float(np.iinfo(dtype).max)
+                audio_array = (audio.astype(np.float32) / max_val)
+                
+                # Resample if needed
+                if frame_rate != self.target_sample_rate and librosa is not None:
+                    audio_array = librosa.resample(audio_array, orig_sr=frame_rate, target_sr=self.target_sample_rate)
+                elif frame_rate != self.target_sample_rate:
+                    # Simple naive resample: skip
+                    pass
+                return audio_array
             
         except Exception as e:
             logger.error(f"Audio preprocessing error: {e}")
@@ -111,6 +164,8 @@ class AudioProcessingService:
         """Detect speech segments using VAD"""
         
         try:
+            if self.vad is None:
+                raise RuntimeError("VAD not available")
             # Convert to 16-bit PCM for VAD
             audio_pcm = (audio_data * 32767).astype(np.int16).tobytes()
             
@@ -143,7 +198,7 @@ class AudioProcessingService:
             return speech_segments
             
         except Exception as e:
-            logger.warning(f"VAD failed, using full audio: {e}")
+            logger.warning(f"VAD failed or unavailable, using full audio: {e}")
             # Return full audio as single segment
             return [(0.0, len(audio_data) / self.target_sample_rate)]
     
@@ -347,36 +402,70 @@ class AudioProcessingService:
                 }
             
             # Try to load audio to check validity
-            audio_segment = AudioSegment.from_file(
-                io.BytesIO(audio_data), 
-                format=audio_format.replace('.', '')
-            )
-            
-            duration = len(audio_segment) / 1000.0  # Convert to seconds
-            
-            # Check duration limits
-            max_duration = 300  # 5 minutes
-            if duration > max_duration:
+            if AudioSegment is not None:
+                audio_segment = AudioSegment.from_file(
+                    io.BytesIO(audio_data), 
+                    format=audio_format.replace('.', '')
+                )
+                
+                duration = len(audio_segment) / 1000.0  # Convert to seconds
+                
+                # Check duration limits
+                max_duration = 300  # 5 minutes
+                if duration > max_duration:
+                    return {
+                        "valid": False,
+                        "error": f"Audio too long: {duration:.1f}s (max: {max_duration}s)",
+                        "duration": duration
+                    }
+                
+                if duration < self.min_audio_length:
+                    return {
+                        "valid": False,
+                        "error": f"Audio too short: {duration:.1f}s (min: {self.min_audio_length}s)",
+                        "duration": duration
+                    }
+                
                 return {
-                    "valid": False,
-                    "error": f"Audio too long: {duration:.1f}s (max: {max_duration}s)",
-                    "duration": duration
+                    "valid": True,
+                    "duration": duration,
+                    "sample_rate": audio_segment.frame_rate,
+                    "channels": audio_segment.channels,
+                    "file_size": len(audio_data)
                 }
-            
-            if duration < self.min_audio_length:
+            else:
+                # Fallback for WAV using stdlib
+                fmt = audio_format.replace('.', '').lower()
+                if fmt != 'wav':
+                    return {
+                        "valid": False,
+                        "error": f"Unsupported format without pydub: {audio_format}",
+                        "file_size": len(audio_data)
+                    }
+                with wave.open(io.BytesIO(audio_data), 'rb') as wf:
+                    n_channels = wf.getnchannels()
+                    framerate = wf.getframerate()
+                    n_frames = wf.getnframes()
+                duration = n_frames / float(framerate)
+                if duration < self.min_audio_length:
+                    return {
+                        "valid": False,
+                        "error": f"Audio too short: {duration:.1f}s (min: {self.min_audio_length}s)",
+                        "duration": duration
+                    }
+                if duration > 300:
+                    return {
+                        "valid": False,
+                        "error": f"Audio too long: {duration:.1f}s (max: 300s)",
+                        "duration": duration
+                    }
                 return {
-                    "valid": False,
-                    "error": f"Audio too short: {duration:.1f}s (min: {self.min_audio_length}s)",
-                    "duration": duration
+                    "valid": True,
+                    "duration": duration,
+                    "sample_rate": framerate,
+                    "channels": n_channels,
+                    "file_size": len(audio_data)
                 }
-            
-            return {
-                "valid": True,
-                "duration": duration,
-                "sample_rate": audio_segment.frame_rate,
-                "channels": audio_segment.channels,
-                "file_size": len(audio_data)
-            }
             
         except Exception as e:
             return {

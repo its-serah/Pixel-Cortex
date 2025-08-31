@@ -6,7 +6,11 @@ with automatic optimization and alerting capabilities.
 """
 
 import time
-import psutil
+# Optional system metrics dependency
+try:
+    import psutil  # type: ignore
+except Exception:
+    psutil = None
 import threading
 import logging
 import numpy as np
@@ -129,11 +133,14 @@ class PerformanceMonitor:
         metrics = {}
         
         # System metrics
-        memory = psutil.virtual_memory()
-        cpu_percent = psutil.cpu_percent(interval=1)
-        
-        metrics[PerformanceMetric.MEMORY_USAGE] = memory.percent
-        metrics[PerformanceMetric.CPU_USAGE] = cpu_percent
+        if psutil:
+            memory = psutil.virtual_memory()
+            cpu_percent = psutil.cpu_percent(interval=0)
+            metrics[PerformanceMetric.MEMORY_USAGE] = getattr(memory, 'percent', 0)
+            metrics[PerformanceMetric.CPU_USAGE] = cpu_percent
+        else:
+            metrics[PerformanceMetric.MEMORY_USAGE] = 0
+            metrics[PerformanceMetric.CPU_USAGE] = 0
         
         # LLM service metrics
         try:

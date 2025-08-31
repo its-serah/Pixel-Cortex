@@ -19,9 +19,19 @@ from transformers import (
     AutoTokenizer, AutoModelForCausalLM, 
     BitsAndBytesConfig, pipeline
 )
-from sentence_transformers import SentenceTransformer
-import psutil
-import redis
+# Optional heavy deps
+try:
+    from sentence_transformers import SentenceTransformer  # type: ignore
+except Exception:
+    SentenceTransformer = None
+try:
+    import psutil  # type: ignore
+except Exception:
+    psutil = None
+try:
+    import redis  # type: ignore
+except Exception:
+    redis = None
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -67,8 +77,10 @@ class LocalLLMService:
         else:
             return "cpu"
     
-    def _init_cache(self) -> Optional[redis.Redis]:
+    def _init_cache(self) -> Optional["redis.Redis"]:
         """Initialize Redis cache for response caching"""
+        if redis is None:
+            return None
         try:
             cache = redis.Redis(
                 host=getattr(settings, 'REDIS_HOST', 'localhost'),
@@ -126,11 +138,18 @@ class LocalLLMService:
             if self.device != "cuda":
                 self.model = self.model.to(self.device)
             
-            # Load embedding model for semantic search
-            self.embedding_model = SentenceTransformer(
-                'all-MiniLM-L6-v2',  # Fast and efficient
-                device=self.device
-            )
+            # Load embedding model for semantic search (optional)
+            if SentenceTransformer is not None:
+                try:
+                    self.embedding_model = SentenceTransformer(
+                        'all-MiniLM-L6-v2',  # Fast and efficient
+                        device=self.device
+                    )
+                except Exception as e:
+                    logger.warning(f"Embedding model not available: {e}")
+                    self.embedding_model = None
+            else:
+                self.embedding_model = None
             
             load_time = time.time() - start_time
             logger.info(f"Model loaded in {load_time:.2f}s")
@@ -159,6 +178,12 @@ class LocalLLMService:
     
     def _check_memory_usage(self) -> Dict[str, float]:
         """Monitor memory usage"""
+        if psutil is None:
+            return {
+                "memory_percent": 0.0,
+                "memory_available_gb": 0.0,
+                "memory_used_gb": 0.0
+            }
         memory = psutil.virtual_memory()
         return {
             "memory_percent": memory.percent,

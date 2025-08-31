@@ -131,3 +131,6 @@ class VoskAudioService:
 
 vosk_audio_service = VoskAudioService()
 
+
+# Singleton instance
+vosk_service = VoskAudioService()

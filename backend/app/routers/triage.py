@@ -6,7 +6,7 @@ from app.models.schemas import TriageRequest, TriageResponse
 from app.services.triage_service import TriageService
 from app.services.planner_service import PlannerService
 from app.services.xai_builder_service import XAIBuilderService
-from app.services.audit_service import AuditService
+from app.services.audit_runtime import AuditService
 from app.services.decision_service import DecisionService, DecisionType
 from app.models.models import Ticket
 
@@ -23,16 +23,17 @@ async def analyze_ticket(
     """
     triage_service = TriageService()
     
-    result = triage_service.triage_ticket(
-        request.title, 
+    # triage_ticket returns a tuple: (category, priority, confidence, explanation)
+    category, priority, confidence, explanation = triage_service.triage_ticket(
+        request.title,
         request.description
     )
     
     return TriageResponse(
-        category=result["category"],
-        priority=result["priority"],
-        confidence=result["confidence"],
-        explanation=result["explanation"]
+        category=category,
+        priority=priority,
+        confidence=confidence,
+        explanation=explanation
     )
 
 @router.post("/process-ticket/{ticket_id}")
@@ -58,12 +59,11 @@ async def process_ticket(
         raise HTTPException(status_code=404, detail="Ticket not found")
     
     # 1. Triage ticket (category/priority)
-    triage_result = triage_service.triage_ticket(ticket.title, ticket.description)
-    triage_explanation = triage_result["explanation"]
+    category, priority, _, triage_explanation = triage_service.triage_ticket(ticket.title, ticket.description)
     
     # Update ticket with triage results
-    ticket.category = triage_result["category"]
-    ticket.priority = triage_result["priority"]
+    ticket.category = category
+    ticket.priority = priority
     
     # 2. Make policy-grounded decision
     decision, decision_explanation = decision_service.make_decision(

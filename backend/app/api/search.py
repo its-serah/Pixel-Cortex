@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 
 from app.services.interactive_search_service import interactive_search_service, SearchType
-from app.core.auth import get_current_user
+from app.core.security import get_current_user
 from app.models.models import User
 
 

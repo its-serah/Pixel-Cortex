@@ -41,6 +41,7 @@ class User(Base):
     full_name = Column(String)
     role = Column(SQLEnum(UserRole), default=UserRole.USER)
     is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)  # Added for test compatibility
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

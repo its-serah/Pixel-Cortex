@@ -2,7 +2,6 @@ services:
   # Backend API service
   - type: web
     name: pixel-cortex-backend
-    rootDir: backend
     runtime: python
     region: oregon # optional
     plan: free

@@ -6,7 +6,11 @@ connected policy information based on initial semantic search results.
 """
 
 import json
-import networkx as nx
+# Optional heavy dep; not required for current implementation
+try:
+    import networkx as nx  # type: ignore
+except Exception:
+    nx = None
 from typing import List, Dict, Set, Tuple, Optional, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
