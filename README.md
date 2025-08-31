@@ -29,6 +29,67 @@ A local-first IT Support ticketing system with Explainable AI (XAI) that provide
 - **RBAC**: Role-based access control (Admin, Agent, User)
 - **Deterministic Processing**: Same input always produces same output
 
+## Quick Start (Local mini‑LLM, no cloud)
+
+1) Install Ollama and pull a small model (choose one)
+- Recommended: phi3:mini (quality)
+- Ultra‑compact: tinyllama (smallest)
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama serve
+# In another terminal
+ollama pull phi3:mini
+export OLLAMA_MODEL=phi3:mini
+```
+
+2) Install backend deps and start API
+```bash
+pip install -r backend/requirements.txt
+uvicorn backend.run_basic:app --reload
+```
+
+3) Index bundled policies for RAG (so answers can cite)
+```bash
+curl -sS -X POST http://localhost:8000/api/rag/index \
+  -H 'Content-Type: application/json' \
+  -d '{"policies_dir":"../policies"}'
+```
+
+4) Ask for a grounded answer with checklist + decision + citations
+```bash
+# Deterministic KG‑RAG (no LLM, always grounded)
+curl -sS -X POST http://localhost:8000/api/llm/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"How do I reset my password?","augment":true,"include_explanation":true}'
+
+# True CoT via your mini model (Ollama)
+curl -sS -X POST http://localhost:8000/api/llm/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"How do I reset my password?","augment":true,"include_explanation":true,"engine":"ollama"}'
+```
+
+5) Ticket lifecycle (auto create and close with citations)
+```bash
+# Auto‑create from a user request
+curl -sS -X POST http://localhost:8000/api/agent/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"My VPN is not working"}'
+
+# Or explicit create
+curl -sS -X POST http://localhost:8000/api/agent/create-ticket \
+  -H 'Content-Type: application/json' \
+  -d '{"issue":"My VPN is not working"}'
+
+# Resolve (stores resolution_reasoning + resolution_policy_citations)
+curl -sS -X POST "http://localhost:8000/api/agent/resolve-ticket/<ID>?resolution_code=RESOLVED_VPN_CACHE_CLEAR"
+```
+
+Notes
+- No OpenAI. Everything runs locally.
+- Deployment files (Render/Docker) and audio endpoints were removed in this streamlined build.
+- If Ollama is not running, deterministic KG‑RAG answers still include citations and reasoning.
+
 ## Architecture
 
 ### Backend (FastAPI + PostgreSQL)

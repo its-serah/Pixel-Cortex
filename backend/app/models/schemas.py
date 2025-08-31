@@ -68,6 +68,9 @@ class TicketResponse(TicketBase):
     updated_at: datetime
     due_date: Optional[datetime] = None
     resolved_at: Optional[datetime] = None
+    resolution_code: Optional[str] = None
+    resolution_reasoning: Optional[str] = None
+    resolution_policy_citations: Optional[List[int]] = None
     triage_confidence: Optional[float] = None
     triage_reasoning: Optional[Dict[str, Any]] = None
     

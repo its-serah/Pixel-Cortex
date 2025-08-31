@@ -214,10 +214,12 @@ async def close_ticket(
     current_user: dict = Depends(verify_token),
     audit_service: AuditService = Depends()
 ):
-    """Close ticket with required resolution_code and log audit."""
+    """Close ticket with required resolution_code and optional reasoning/citations; log audit."""
     code = (payload or {}).get("resolution_code", "").strip()
     if not code:
         raise HTTPException(status_code=400, detail="resolution_code is required")
+    reasoning = (payload or {}).get("resolution_reasoning")
+    citations = (payload or {}).get("resolution_policy_citations")
 
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
@@ -230,6 +232,14 @@ async def close_ticket(
     ticket.status = TicketStatus.CLOSED
     ticket.resolved_at = datetime.utcnow()
     ticket.resolution_code = code
+    if reasoning:
+        ticket.resolution_reasoning = reasoning
+    if citations:
+        try:
+            # ensure list of ints
+            ticket.resolution_policy_citations = [int(x) for x in citations]
+        except Exception:
+            ticket.resolution_policy_citations = citations
     db.commit()
     db.refresh(ticket)
 
@@ -249,10 +259,20 @@ async def close_ticket(
         resource_type="ticket",
         resource_id=str(ticket.id),
         user_id=current_user["username"],
-        event_data={"resolution_code": code}
+        event_data={
+            "resolution_code": code,
+            "has_reasoning": bool(reasoning),
+            "citations_count": len(citations or [])
+        }
     )
 
-    return {"message": "Ticket closed", "ticket_id": ticket.id, "resolution_code": code}
+    return {
+        "message": "Ticket closed",
+        "ticket_id": ticket.id,
+        "resolution_code": code,
+        "resolution_reasoning": ticket.resolution_reasoning,
+        "resolution_policy_citations": ticket.resolution_policy_citations
+    }
 
 @router.get("/{ticket_id}/events", response_model=List[TicketEventResponse])
 async def get_ticket_events(
