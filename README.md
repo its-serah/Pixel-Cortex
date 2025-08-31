@@ -151,9 +151,21 @@ Screenshots / UI
 - Try: "vpn not working" — it returns the grounded answer and creates a ticket, all in one response
 - Swagger UI: http://localhost:8000/docs (execute /api/agent/ask for a JSON response)
 
+**Figure 1 — Home / Hero**
+
 ![Home / Hero](backend/static/screenshots/cortexs1.png)
-![Chat Open](backend/static/screenshots/cortexs2.png)
-![One-shot Ticket Result](backend/static/screenshots/cortexs3.png)
+
+**Figure 2 — Ask the IT Agent**
+
+![Ask the IT Agent](backend/static/screenshots/cortexs6.png)
+
+**Figure 3 — Policy‑Cited Response**
+
+![Policy‑Cited Response](backend/static/screenshots/cortexs7.png)
+
+**Figure 4 — One‑shot Ticket Created**
+
+![One‑shot Ticket Created](backend/static/screenshots/cortexs8.png)
 
 ## Architecture
 
