@@ -340,6 +340,7 @@ export default function AIWorkbench() {
             )}
           </>
 
+)}
             {createdTicket && (
               <div className="mt-4 bg-white border rounded p-3">
                 <div className="flex items-center justify-between">
@@ -356,7 +357,6 @@ export default function AIWorkbench() {
                 </div>
               </div>
             )}
-        )}
       </Section>
     </div>
   );

@@ -21,6 +21,7 @@ rank-bm25==0.2.2
 nltk==3.8.1
 numpy==1.25.2
 PyPDF2==3.0.1
+markdown==3.6  # for PolicyIndexer to parse .md files
 
 # CPU-only Speech-to-Text (optional; disabled in minimal Render build)
 # vosk==0.3.45
@@ -31,8 +32,8 @@ PyPDF2==3.0.1
 # Option 1: Use external API (Together.ai, OpenAI, etc)
 requests==2.31.0
 
-# Option 2: ONNX Runtime for tiny models (RECOMMENDED)
-onnxruntime==1.16.0  # Only 15MB!
+# Option 2: ONNX Runtime - removed for minimal build
+# onnxruntime==1.16.0
 
 # Option 3: Connect to external Ollama server
 ollama==0.3.3

@@ -42,7 +42,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -50,33 +50,17 @@ app.add_middleware(
 
 # Include basic routers (without heavy LLM dependencies)
 try:
-    from app.routers import auth, tickets, users, policies, triage, performance
+    from app.routers import auth, tickets, users, policies, triage
     app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
     app.include_router(users.router, prefix="/api/users", tags=["Users"])
     app.include_router(tickets.router, prefix="/api/tickets", tags=["Tickets"])
     app.include_router(policies.router, prefix="/api/policies", tags=["Policies"])
     app.include_router(triage.router, prefix="/api/triage", tags=["Triage"])
-    app.include_router(performance.router, prefix="/api/performance", tags=["Performance"])
     print("Core routers loaded successfully")
 except ImportError as e:
     print(f"Warning: Some routers failed to load: {e}")
 
-# Try to load search router separately 
-try:
-    from app.api import search
-    app.include_router(search.router, prefix="/api/search", tags=["Search"])
-    print("Search router loaded successfully")
-except ImportError as e:
-    print(f"Search router not available: {e}")
-
-# CPU Audio (Vosk) endpoints
-try:
-    from app.api import audio_cpu
-    app.include_router(audio_cpu.router, prefix="/api/audio", tags=["Audio CPU"])
-    print("Vosk CPU audio endpoints enabled")
-except Exception as e:
-    print(f"Audio CPU router not available: {e}")
-
+# Minimal routers only
 # KG Lite endpoints (no spaCy/networkx)
 try:
     from app.api import kg_lite
@@ -84,14 +68,6 @@ try:
     print("KG Lite endpoints enabled")
 except Exception as e:
     print(f"KG Lite router not available: {e}")
-
-# Tiny LLM endpoints (Works on free tier!)
-try:
-    from app.api import tiny_llm
-    app.include_router(tiny_llm.router, prefix="/api/tiny-llm", tags=["Tiny LLM"])
-    print("Tiny LLM endpoints enabled (ONNX/API/Rules)")
-except Exception as e:
-    print(f"Tiny LLM router not available: {e}")
 
 # LLM Chat (Ollama) endpoints
 try:
@@ -101,7 +77,7 @@ try:
 except Exception as e:
     print(f"LLM chat router not available: {e}")
 
-# RAG API (index + search) for AI Workbench compatibility
+# RAG API (index + search) for policies
 try:
     from app.api import rag_api
     app.include_router(rag_api.router, prefix="/api/rag", tags=["RAG"])
@@ -109,19 +85,11 @@ try:
 except Exception as e:
     print(f"RAG API router not available: {e}")
 
-# KG Query compat for AI Workbench
-try:
-    from app.api import kg_query
-    app.include_router(kg_query.router, prefix="/api/kg", tags=["Knowledge Graph"])
-    print("KG Query endpoints enabled")
-except Exception as e:
-    print(f"KG Query router not available: {e}")
-
-# IT Support Agent (ML Challenge implementation)
+# IT Support Agent (LLM+RAG)
 try:
     from app.api import it_agent
     app.include_router(it_agent.router, prefix="/api/agent", tags=["IT Agent"])
-    print("IT Support Agent enabled (TinyLlama/Rules)")
+    print("IT Support Agent enabled (Ollama + RAG)")
 except Exception as e:
     print(f"IT Agent not available: {e}")
 
@@ -162,4 +130,4 @@ async def get_features():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, port=8000)

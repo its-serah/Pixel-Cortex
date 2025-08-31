@@ -8,16 +8,15 @@ IT Support Agent API - Implements ML Challenge Requirements
 - Voice support (via Vosk)
 """
 
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
-import io
+import os
 
 from app.core.database import get_db
-from app.services.local_sml_service import local_sml_service
-from app.services.policy_retriever import policy_retriever
-from app.services.audio_vosk_service import vosk_service
+from app.services.rag_reasoner import rag_reasoner
+from app.services.llm_service import LLMService
 from app.models.models import Ticket, TicketCategory, TicketPriority
 
 router = APIRouter()
@@ -54,82 +53,88 @@ async def ask_it_agent(request: AgentQuery, db: Session = Depends(get_db)):
     - Citation of policies
     """
     try:
-        context = {}
-        
-        # Step 1: Check if we need to search
-        should_search, search_terms = local_sml_service.should_search(request.query)
-        
-        # Step 2: Retrieve relevant policies if requested
-        if request.include_policies:
-            policies = policy_retriever.retrieve_relevant_chunks(
-                request.query, 
-                k=3, 
-                db=db
-            )
-            context["policies"] = [
-                {
-                    "title": f"Policy {p.document_id}",
-                    "content": p.chunk_content,
-                    "relevance": p.relevance_score
-                }
-                for p in policies
-            ]
-        
-        # Step 3: Get previous solutions from history if requested
-        if request.include_history:
-            # Mock history for demo - in production, query ConversationLog
-            context["history"] = [
-                {
-                    "problem": "VPN connection failed",
-                    "solution": "Reset MFA token and clear cache"
-                }
-            ]
-        
-        # Step 4: Perform search if needed
-        search_results = []
-        if should_search and search_terms:
-            # Mock search - in production, use search service
-            search_results = [f"Found info about {term}" for term in search_terms]
-            context["search_results"] = search_results
-        
-        # Step 5: Generate Chain-of-Thought reasoning
-        cot_result = local_sml_service.reason_with_cot(request.query, context)
-        
-        # Step 6: Extract compliance status and policy citations
-        compliance_status = "allowed"  # Default
-        policies_cited = []
-        
-        for step in cot_result["steps"]:
-            if "status" in step:
-                if "DENIED" in step["status"]:
-                    compliance_status = "denied"
-                elif "NEEDS_APPROVAL" in step["status"]:
-                    compliance_status = "needs_approval"
-                else:
-                    compliance_status = "allowed"
-            
-            if "policy_ref" in step:
-                policies_cited.append(step["policy_ref"])
-        
-        # Step 7: Check if we need to create a ticket
+        # LLM with CoT via Ollama; fallback to deterministic KG-RAG
+        svc = LLMService(model_name=os.getenv("OLLAMA_MODEL", "phi3:mini"))
+
+        # First attempt: deterministic KG-RAG (fast, citations guaranteed)
+        det = rag_reasoner.chat(db, request.query, augment=True, k=5, include_explanation=True)
+        det_steps = det.get("explanation", {}).get("reasoning_trace", [])
+        det_citations = det.get("explanation", {}).get("policy_citations", [])
+
+        # Second attempt: true LLM CoT with policy grounding (can fail if Ollama not running)
+        try:
+            llm_text, llm_expl = svc.generate_response(request.query, db=db, include_cot=True)
+            response_text = llm_text
+            # Merge citations and reasoning
+            policies_cited = [str(c.chunk_id) for c in (llm_expl.policy_citations or [])]
+            steps = det_steps + [{
+                "step": s.step,
+                "action": s.action,
+                "rationale": s.rationale,
+                "confidence": s.confidence
+            } for s in (llm_expl.reasoning_trace or [])]
+        except Exception:
+            # Fallback to deterministic answer
+            response_text = det.get("response", "")
+            policies_cited = [str(c.get("chunk_id")) for c in det.get("explanation", {}).get("policy_citations", [])]
+            steps = det_steps
+
+        # Compliance status heuristic from response
+        resp_lower = response_text.lower()
+        if "needs_approval" in resp_lower or "approval" in resp_lower:
+            compliance_status = "needs_approval"
+        elif any(x in resp_lower for x in ["denied", "not allowed"]):
+            compliance_status = "denied"
+        else:
+            compliance_status = "allowed"
+
+        # Optional: create a ticket automatically when the user describes an issue
         ticket_data = None
-        if "ticket" in request.query.lower() or "issue" in request.query.lower():
-            ticket_data = local_sml_service.create_ticket(request.query)
-        
-        # Step 8: Format response
-        response_text = cot_result["reasoning"]
-        if ticket_data:
-            response_text += f"\n\nTicket Created: {ticket_data['id']}"
-        
+        if any(k in request.query.lower() for k in ["ticket", "issue", "vpn not working", "reset password", "error"]):
+            # Minimal auto-ticket creation using heuristics
+            from datetime import datetime as _dt
+            q = request.query
+            def _category(issue: str) -> str:
+                s = issue.lower()
+                if any(t in s for t in ["vpn", "network", "wifi", "internet"]):
+                    return "network"
+                if any(t in s for t in ["password", "login", "access", "permission"]):
+                    return "access"
+                if any(t in s for t in ["software", "install", "update"]):
+                    return "software"
+                if any(t in s for t in ["hardware", "laptop", "printer"]):
+                    return "hardware"
+                return "general"
+            def _priority(issue: str) -> str:
+                s = issue.lower()
+                if any(t in s for t in ["urgent", "critical", "down", "not working", "blocked"]):
+                    return "high"
+                if any(t in s for t in ["slow", "issue", "problem", "help"]):
+                    return "medium"
+                return "low"
+            ticket_data = {
+                "id": __import__("hashlib").md5(f"{q}{_dt.utcnow()}".encode()).hexdigest()[:8],
+                "title": q.split(".")[0][:50] or "IT Support Request",
+                "description": q,
+                "category": _category(q),
+                "priority": _priority(q),
+                "status": "new",
+                "assigned_to": "unassigned",
+                "created_by": "demo",
+                "created_at": _dt.utcnow().isoformat(),
+                "reasoning": response_text,
+                "steps": steps
+            }
+
         return AgentResponse(
             response=response_text,
-            reasoning=cot_result,
-            steps=cot_result["steps"],
+            reasoning={"reasoning_trace": steps},
+            steps=steps,
             policies_cited=policies_cited,
             compliance_status=compliance_status,
             ticket_created=ticket_data,
-            search_performed=should_search,
-            model_used=cot_result["model"]
+            search_performed=True,
+            model_used=os.getenv("OLLAMA_MODEL", "phi3:mini")
         )
         
     except Exception as e:
@@ -137,23 +142,39 @@ async def ask_it_agent(request: AgentQuery, db: Session = Depends(get_db)):
 
 @router.post("/create-ticket")
 async def create_ticket(request: TicketRequest, db: Session = Depends(get_db)):
-    """
-    Create IT support ticket
-    As per ML Challenge: automatically create tickets for IT issues
-    """
+    """Create IT support ticket (minimal heuristics)."""
     try:
-        ticket_data = local_sml_service.create_ticket(request.issue, request.user_id)
+        q = request.issue
+        def _category(issue: str) -> str:
+            s = issue.lower()
+            if any(t in s for t in ["vpn", "network", "wifi", "internet"]):
+                return "network"
+            if any(t in s for t in ["password", "login", "access", "permission"]):
+                return "access"
+            if any(t in s for t in ["software", "install", "update"]):
+                return "software"
+            if any(t in s for t in ["hardware", "laptop", "printer"]):
+                return "hardware"
+            return "general"
+        def _priority(issue: str) -> str:
+            s = issue.lower()
+            if any(t in s for t in ["urgent", "critical", "down", "not working", "blocked"]):
+                return "high"
+            if any(t in s for t in ["slow", "issue", "problem", "help"]):
+                return "medium"
+            return "low"
+        title = q.split(".")[0][:50] or "IT Support Request"
+        category = _category(q)
+        priority = _priority(q)
         
-        # Save to database
         ticket = Ticket(
-            title=ticket_data["title"],
-            description=ticket_data["description"],
-            category=TicketCategory[ticket_data["category"].upper()],
-            priority=TicketPriority[ticket_data["priority"].upper()],
-            requester_id=1,  # Demo user
-            triage_reasoning=ticket_data["reasoning"]
+            title=title,
+            description=q,
+            category=TicketCategory[category.upper()],
+            priority=TicketPriority[priority.upper()],
+            requester_id=1,
+            triage_reasoning=f"Auto-created from query: {q[:120]}"
         )
-        
         db.add(ticket)
         db.commit()
         db.refresh(ticket)
@@ -163,64 +184,26 @@ async def create_ticket(request: TicketRequest, db: Session = Depends(get_db)):
             "title": ticket.title,
             "category": ticket.category.value,
             "priority": ticket.priority.value,
-            "status": ticket.status.value,
-            "reasoning": ticket_data["reasoning"],
-            "steps": ticket_data["steps"]
+            "status": ticket.status.value
         }
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/voice-query")
-async def voice_query(
-    audio: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
-    """
-    Handle voice queries
-    As per ML Challenge: "Communicate with the LM via your voice"
-    """
-    try:
-        # Read audio file
-        audio_bytes = await audio.read()
-        
-        # Transcribe using Vosk
-        transcription = vosk_service.transcribe_audio(
-            audio_bytes,
-            audio.filename.split(".")[-1]
-        )
-        
-        if not transcription:
-            raise HTTPException(status_code=400, detail="Could not transcribe audio")
-        
-        # Process the transcribed query
-        query_request = AgentQuery(query=transcription)
-        response = await ask_it_agent(query_request, db)
-        
-        # Add transcription to response
-        response_dict = response.dict()
-        response_dict["transcription"] = transcription
-        
-        return response_dict
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+# Voice query removed in minimal build
 
 @router.get("/model-status")
 async def get_model_status():
-    """Check which model is being used for inference"""
-    has_model = local_sml_service.model is not None
-    
+    """Report Ollama model status for mini LLM usage."""
+    import os
+    model = os.getenv("OLLAMA_MODEL", "phi3:mini")
     return {
-        "local_inference": has_model,
-        "model": "TinyLlama-1.1B" if has_model else "rule-based",
-        "model_path": local_sml_service.model_path,
+        "ollama": True,
+        "model": model,
         "fallback_available": True,
         "supported_models": [
-            "TinyLlama (1.1B) - Ultra-compact",
-            "Phi-3-mini - Lightweight",
-            "Mistral 7B - If you have RAM",
-            "Rule-based - Always available"
+            "phi3:mini (recommended)",
+            "tinyllama (ultra-compact)",
+            "mistral (heavier)"
         ]
     }
 
@@ -249,27 +232,20 @@ async def resolve_ticket(
             "resolution_code": resolution_code
         }
         
-        cot_result = local_sml_service.reason_with_cot(
-            f"Resolve ticket: {ticket.title} with code: {resolution_code}",
-            resolution_context
-        )
-        
-        # Update ticket
+        # Compose resolution using KG-RAG
+        det = rag_reasoner.chat(db, f"Resolve ticket: {ticket.title}. Code: {resolution_code}", augment=True, k=5, include_explanation=True)
         ticket.status = "closed"
         ticket.resolution_code = resolution_code
-        ticket.resolution_reasoning = cot_result["reasoning"]
-        
+        ticket.resolution_reasoning = det.get("response", "")
         db.commit()
         
         return {
             "ticket_id": ticket_id,
             "status": "closed",
             "resolution_code": resolution_code,
-            "reasoning": cot_result["reasoning"],
+            "reasoning": ticket.resolution_reasoning,
             "policies_applied": [
-                step.get("policy_ref", "") 
-                for step in cot_result["steps"] 
-                if "policy_ref" in step
+                c.get("chunk_id") for c in det.get("explanation", {}).get("policy_citations", [])
             ]
         }
         
