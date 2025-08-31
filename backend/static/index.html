@@ -48,7 +48,7 @@
         }
         .logo {
             width: 32px; height: 32px; display: inline-block;
-            background: url('./assets/pixelCortexLogo.svg') center/contain no-repeat;
+            background: url('/static/assets/pixelCortexLogo.svg') center/contain no-repeat;
         }
         .title { font-size: 1.4rem; font-weight: 600; }
         .subtitle { color: var(--muted); margin-bottom: 16px; font-size: 0.95rem; }
@@ -90,6 +90,14 @@
         .example-btn:hover { background: var(--brand); color: white; }
         .ticket-badge { margin-top: 10px; background: var(--success-bg); border: 1px solid var(--success-border); padding: 10px; border-radius: 10px; font-size: 14px; }
         .meta { color: var(--muted); font-size: 12px; margin-top: 6px; }
+        /* New UI additions */
+        .statusbar { display:flex; gap:8px; flex-wrap: wrap; margin: 8px 0 14px 0; }
+        .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--border); border-radius: 999px; background:#fff; font-size: 12px; color: var(--muted); }
+        .chip .dot { width:8px; height:8px; border-radius:50%; background: #22c55e; }
+        .info-cards { margin-top: 18px; display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
+        .card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px; }
+        .card h4 { margin-bottom: 6px; font-size: 0.95rem; }
+        .card p { color: var(--muted); font-size: 0.9rem; }
     </style>
 </head>
 <body>
@@ -98,7 +106,12 @@
             <span class="logo" aria-hidden="true"></span>
             <div class="title">Pixel Cortex IT Support</div>
         </div>
-        <p class="subtitle">Local-first helpdesk. Clear answers with policy citations. No fluff.</p>
+        <p class="subtitle">Local-first helpdesk. Clear, friendly answers grounded in your IT policies. Your data stays on this machine.</p>
+        <div class="statusbar">
+            <span class="chip"><span class="dot"></span><span id="modelChip">Model: loading…</span></span>
+            <span class="chip">Logs: enabled</span>
+            <span class="chip">Auto-ticket: on</span>
+        </div>
         
         <div class="chat-box" id="chatBox">
             <div class="message agent-message">
@@ -133,6 +146,21 @@
             <button class="example-btn" onclick="setExample('Can I install Chrome on my work laptop?')">Software Request</button>
             <button class="example-btn" onclick="setExample('Create a ticket for printer not working')">Create Ticket</button>
         </div>
+
+        <div class="info-cards">
+            <div class="card">
+                <h4>What I can help with</h4>
+                <p>• Passwords and access • VPN and connectivity • Software install requests • Policy questions</p>
+            </div>
+            <div class="card">
+                <h4>How it works</h4>
+                <p>I search your policy docs (RAG) and use a small local LLM for reasoning. I cite sources and log my steps.</p>
+            </div>
+            <div class="card">
+                <h4>Privacy</h4>
+                <p>No cloud. All processing happens locally. Reasoning is saved to <code>backend/logs/agent_requests.jsonl</code>.</p>
+            </div>
+        </div>
     </div>
     
     <script>
@@ -140,6 +168,16 @@
         function setExample(text) { const el = document.getElementById('userInput'); el.value = text; el.focus(); }
         
         function safe(val, fallback='—') { return (val === undefined || val === null || val === '') ? fallback : val; }
+        
+        async function fetchModelStatus() {
+            try {
+                const res = await fetch(`${API_URL}/api/agent/model-status`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const chip = document.getElementById('modelChip');
+                if (chip) chip.textContent = `Model: ${safe(data.model || data.model_name || 'mini')}`;
+            } catch (_) {}
+        }
         
         async function sendMessage() {
             const input = document.getElementById('userInput');
@@ -194,6 +232,7 @@
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
         }
+        document.addEventListener('DOMContentLoaded', fetchModelStatus);
     </script>
 </body>
 </html>
